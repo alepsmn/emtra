@@ -8,8 +8,8 @@
 - Tests de aceptación `test_makefile_has_all_targets` y `test_compose_is_valid`, escritos en el primer commit (en rojo) y ahora en verde.
 
 ## No hecho / en rojo (con motivo)
-- **`make` no está instalado en esta WSL** (`make: command not found`; sin sudo no pude instalarlo). El Makefile **no se ha ejecutado con `make`**. Verifiqué los equivalentes a mano: `uv sync`, `ruff check .`, `mypy contracts emtra_common`, `pytest tests/unit tests/acceptance` (2 passed) y `docker compose up --wait`. Pendiente: `sudo apt install make` y comprobar `make setup lint test up down`.
-- No probado en un clon limpio (checklist 1) por lo mismo; `uv sync` desde cero sí funcionó.
+- Nada en rojo. `make` no venía instalado en la WSL; se extrajo `make` 4.4.1 del .deb a `~/.local/bin` (sin root). Para CI y otros equipos: `sudo apt install make`.
+- No probado en un clon limpio (checklist 1); `make setup lint test up down` sí verificado en el árbol de trabajo.
 
 ## Supuestos y decisiones tomadas
 - Puerto del host de TimescaleDB: **5433** (→5432 del contenedor). El 5432 lo ocupa otro contenedor de la máquina (`vinoteca-db`). Los servicios deben conectar a `localhost:5433`. Dentro del compose (Grafana) sigue siendo `timescaledb:5432`.
