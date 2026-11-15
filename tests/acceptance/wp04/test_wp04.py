@@ -284,10 +284,10 @@ def test_cvh_vs_truth(clean_days):  # K4
     sys_bs = pd.read_parquet(d / "band_status.parquet")
     tr = pd.read_parquet(d / "truth_arrivals.parquet")
     wm = pd.read_parquet(d / "watermarks.parquet")
-    truth_arrivals = [arr(r.line_id, r.stop_id, r.arrival_time.to_pydatetime(), r.bus_id)
+    truth_arrivals = [arr(r.line_id, r.stop_id, r.arrival_time.to_pydatetime(warn=False), r.bus_id)
                       for r in tr.itertuples()]
     out = replay(Monitor(pd.read_parquet(d / "timetable.parquet")), truth_arrivals,
-                 [Watermark(watermark=w.to_pydatetime()) for w in wm.watermark])
+                 [Watermark(watermark=w.to_pydatetime(warn=False)) for w in wm.watermark])
     truth_bs = pd.DataFrame([o.model_dump() for o in out if isinstance(o, BandStatus)])
     key = ["line_id", "direction_id", "segment_id", "band_start"]
     both = sys_bs.merge(truth_bs, on=key, suffixes=("_sys", "_true"))
