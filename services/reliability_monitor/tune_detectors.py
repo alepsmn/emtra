@@ -20,6 +20,7 @@ from emtra_common.rng import rng
 from services.reliability_monitor.baseline import collect_status, indicator_x, load_baseline
 from services.reliability_monitor.config import MonitorConfig, load_monitor_config
 
+RESIDUALS_FILE = CONFIG_DIR / "baselines" / "c19_residuals.npy"
 RUNS = 4000      # in-control runs per ARL0 estimate (standard error about 1.6 %)
 CAP = 60_000     # a run longer than this is censored at CAP (negligible for a target of 2000)
 
@@ -39,6 +40,11 @@ def residuals(cfg: MonitorConfig) -> np.ndarray:
         assert cell is not None
         z.append((indicator_x(r.indicator, r.value) - cell.mu0) / max(cell.sigma0, cfg.sigma_floor))
     return np.array(z)
+
+
+def load_residuals() -> np.ndarray:
+    """The residuals the committed L and h were tuned on (written by `main`)."""
+    return np.load(RESIDUALS_FILE)
 
 
 def arl0(step: Step, pool: np.ndarray, name: str, runs: int = RUNS) -> float:
@@ -78,6 +84,7 @@ def smallest(make: Callable[[float], Step], lo: float, hi: float, pool: np.ndarr
 def main() -> None:
     cfg = load_monitor_config()
     pool = residuals(cfg)
+    np.save(RESIDUALS_FILE, pool)
     print(f"{len(pool)} residuals: mean {pool.mean():.3f}, sd {pool.std():.3f}, "
           f"skew {((pool - pool.mean()) ** 3).mean() / pool.std() ** 3:.2f}")
     L, arl_e = smallest(lambda L: ewma_step(cfg.ewma.lam, L), 1.0, 8.0, pool, "ewma",

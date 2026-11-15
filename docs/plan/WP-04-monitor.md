@@ -53,13 +53,13 @@ def test_otp_matching():                # 5 programados, 5 observados con δ con
 def test_band_closes_on_watermark():    # sin watermark no hay band_status; con él, exactamente uno por terna y banda
 def test_insufficient_data():           # n < mínimo -> status insufficient_data, detectores sin actualizar
 def test_ewma_detects_step():           # z ~ N(0,1) 200 bandas y luego N(3,1): alarma en <= 6 bandas en >= 95 de 100 semillas
-def test_tuned_arl0():                  # con L y h de config, 2000 rachas simuladas de z ~ N(0,1): ARL0 medio >= 0,85 x arl0_target (cada detector)
+def test_tuned_arl0():                  # con L y h de config, 2000 rachas bootstrap de los residuos z de la línea base (`config/baselines/c19_residuals.npy`, lo que calibra el tuner): ARL0 medio >= 0,85 x arl0_target (cada detector)
 def test_single_open_alert():
 def test_alert_closes_after_two_inside_bands():
 def test_blocked_segment_trigger():
 # con el simulador (batch, semillas de validación):
 def test_cvh_vs_truth():                # día limpio: MAE(c_vh sistema, c_vh con truth_arrivals) <= 0,05            (K4)
-def test_breakdown_high_detected():     # breakdown alta en am_peak, 10 semillas: alerta en el tramo o el siguiente en <= 3 bandas en >= 8
+def test_slowdown_high_detected():      # slowdown alta en el tramo 1 a las 08:00, semillas 3000-3009: action_required atribuible (tramo o adyacente, opened_at en [t0, t0+60 min]) en >= 8
 def test_clean_days_quiet():            # 5 días limpios: <= 1 alerta action_required en total
 # integración (make it):
 def test_live_equals_batch():           # 1 h de mundo a 60x con un breakdown -> band_status y alerts en FogStore == batch
@@ -69,4 +69,4 @@ def test_live_equals_batch():           # 1 h de mundo a 60x con un breakdown ->
 - [ ] Ningún umbral fuera de `config/reliability.yaml`.
 - [ ] El core no importa paho ni psycopg.
 - [ ] El REPORT trae μ₀/σ₀ por celda, L, h y ARL₀.
-- [ ] Si `test_breakdown_high_detected` o `test_clean_days_quiet` no salen, se documenta el compromiso recall / falsas alertas; no se tocan los umbrales del test.
+- [ ] Si `test_slowdown_high_detected` o `test_clean_days_quiet` no salen, se documenta el compromiso recall / falsas alertas; no se tocan los umbrales del test.

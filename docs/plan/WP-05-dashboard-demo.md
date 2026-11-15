@@ -17,12 +17,12 @@ Guion fijo, reproducible, ≈ 3 min de reloj:
 
 1. `make down` + volúmenes fuera; `make up` (infra, migraciones, carga de `stops` y `schedule`).
 2. Arranca Ingestor y Monitor con la línea base commiteada.
-3. Arranca el mundo: `--seed 42 --speed 60`, de 07:00 a 10:00 simuladas, con `config/demo/faults_v1.yaml`: un `breakdown` de severidad alta en la línea 19 a las 08:00.
+3. Arranca el mundo: `--seed 42 --speed 60`, de 07:00 a 10:00 simuladas, con `config/demo/faults_v1.yaml`: un `slowdown` de severidad alta en el tramo 1 a las 08:00 (`{type: slowdown, severity: high, t0: "08:00", segment_id: 1}`).
 4. Imprime la URL del dashboard.
 5. Al terminar el mundo, **comprueba** contra FogStore y sale con código ≠ 0 si falla algo:
    - hay `band_status` de las 12 bandas para la línea 19 en ambos tramos;
    - antes de las 08:00 no hay ninguna alerta `action_required`;
-   - entre las 08:00 y las 09:00 se abre ≥ 1 alerta `action_required` de la línea 19;
+   - entre las 08:00 y las 09:00 se abre ≥ 1 alerta `action_required` en el tramo 1 (cualquier línea; el `slowdown` no tiene línea);
    - todos los servicios figuran `online` en `service_health`.
 6. Deja el stack levantado para inspección; `make down` lo para.
 

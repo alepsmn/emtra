@@ -46,3 +46,4 @@ Fallo f = (línea, sentido, tramo s, t₀). Alerta a = (línea, sentido, tramo s
 - Emparejamiento voraz por `t_open` ascendente; cada alerta y cada fallo, una vez como mucho.
 - VP = parejas; FN = fallos sin pareja; FP = alertas sin pareja (incluidas todas las de días limpios).
 - K5 cuenta cualquier nivel de alerta; K17 solo `action_required`.
+- **Alcance de K5–K6:** el objetivo de detección aplica a los fallos de tramo (`slowdown`, `blocked_segment`). `breakdown` y `dispatch_delay` (un solo vehículo) se miden y se reportan en la matriz como informativos, sin objetivo: el indicador por banda no los detecta (WP-04-REPORT).

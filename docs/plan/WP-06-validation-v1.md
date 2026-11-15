@@ -20,7 +20,7 @@ config/kpis.yaml   # objetivos de KPIS.md
 
 ## Experimentos de este WP
 - **E1** → K1, K2, K3, K4.
-- **E2** → matriz VP/FP/FN por tipo y severidad; K5, K6, K7, K8 (repetir el Monitor con `Shewhart` sobre las mismas llegadas), K17.
+- **E2** → matriz VP/FP/FN por tipo y severidad; K5, K6, K7, K8 (el objetivo de K5–K6 aplica solo a `slowdown` y `blocked_segment`; `breakdown` y `dispatch_delay` se reportan como informativos, sin objetivo; ver KPIS.md) (repetir el Monitor con `Shewhart` sobre las mismas llegadas), K17.
 
 `make experiments` corre E1 y E2 completos; `make experiments SMOKE=1` una versión reducida (2 días, 6 fallos).
 

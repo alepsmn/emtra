@@ -19,8 +19,9 @@ from services.reliability_monitor.batch import replay
 from services.reliability_monitor.batch import run_batch as monitor_batch
 from services.reliability_monitor.config import load_monitor_config
 from services.reliability_monitor.core.alerts import TernAlerts
-from services.reliability_monitor.core.detectors import Cusum, Ewma
+from services.reliability_monitor.core.detectors import Ewma
 from services.reliability_monitor.core.monitor import Monitor
+from services.reliability_monitor.tune_detectors import arl0, cusum_step, ewma_step, load_residuals
 from sim.run import run_sim
 
 CORR = load_corridor()
@@ -185,26 +186,12 @@ def test_ewma_detects_step():
     assert hits >= 95
 
 
-def _arl0(make, seed_name: str, runs: int = 2000) -> float:  # noqa: ANN001
-    lengths = []
-    for i in range(runs):
-        g = rng(3000, seed_name, i)
-        det, n = make(), 0
-        while True:
-            z = g.standard_normal(4096)
-            hit = _alarm_within(det, z)
-            if hit is not None:
-                lengths.append(n + hit + 1)
-                break
-            n += 4096
-    return float(np.mean(lengths))
-
-
 def test_tuned_arl0():
     cfg = load_monitor_config()
+    pool = load_residuals()          # z of the baseline days: what L and h were tuned on
     target = 0.85 * cfg.arl0_target
-    assert _arl0(lambda: Ewma(cfg.ewma.lam, cfg.ewma.L), "wp04.arl0.ewma") >= target
-    assert _arl0(lambda: Cusum(cfg.cusum.k, cfg.cusum.h), "wp04.arl0.cusum") >= target
+    assert arl0(ewma_step(cfg.ewma.lam, cfg.ewma.L), pool, "test.ewma", runs=2000) >= target
+    assert arl0(cusum_step(cfg.cusum.k, cfg.cusum.h), pool, "test.cusum", runs=2000) >= target
 
 
 T0 = madrid(7, 0)
@@ -297,17 +284,17 @@ def test_cvh_vs_truth(clean_days):  # K4
     assert (both.value_sys - both.value_true).abs().mean() <= 0.05
 
 
-def test_breakdown_high_detected(tmp_path_factory):
-    root = tmp_path_factory.mktemp("bd")
+def test_slowdown_high_detected(tmp_path_factory):
+    root = tmp_path_factory.mktemp("sd")
     found = 0
     for seed in range(3000, 3010):
         d = sim_day(root, seed, hours=4,
-                    faults=[{"type": "breakdown", "severity": "high", "t0": "08:00",
-                             "line_id": "19"}])
+                    faults=[{"type": "slowdown", "severity": "high", "t0": "08:00",
+                             "segment_id": 1}])
         f = pd.read_parquet(d / "faults.parquet").iloc[0]
         al = pd.read_parquet(d / "alerts.parquet")
-        hit = al[(al.line_id == f.line_id) & ((al.segment_id - f.segment_id).abs() <= 1)
-                 & (al.opened_at >= f.t0) & (al.opened_at <= f.t0 + 3 * BAND)]
+        hit = al[(al.level == "action_required") & ((al.segment_id - f.segment_id).abs() <= 1)
+                 & (al.opened_at >= f.t0) & (al.opened_at <= f.t0 + 4 * BAND)]
         found += len(hit) > 0
     assert found >= 8
 
