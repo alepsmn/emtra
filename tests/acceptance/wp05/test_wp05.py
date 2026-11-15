@@ -149,8 +149,9 @@ def test_panel_queries_run(demo_runs):
                 if title != "Alertas abiertas":  # may legitimately be empty at the end
                     assert rows or title.startswith("Indicador"), (title, line, segment)
         # the indicator panel has data for line 19 (c_vh) and for 170 (OTP)
-        by = {t: s for t, s in _queries(d)}
-        assert c.execute(_render(by["Indicador en el tiempo"], "19", "1")).fetchall()
+        ind = [s for t, s in _queries(d) if t == "Indicador en el tiempo"]
+        assert any(c.execute(_render(s, "19", "1")).fetchall() for s in ind)
+        assert any(c.execute(_render(s, "170", "1")).fetchall() for s in ind)
 
 
 # ---------------------------------------------------------------- clean start
@@ -178,6 +179,7 @@ def test_reset_clears_sessions_retained_and_tables():
     from emtra_common import db
 
     db.apply_migrations()
+    subprocess.run([str(DEMO_SH), "stop"], cwd=ROOT, check=True, timeout=60)  # as the demo does
     # 1. a persistent session with a queued message, a retained message, a row in a table
     sub = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="ingestor", clean_session=False)
     emqtt.connect(sub)
