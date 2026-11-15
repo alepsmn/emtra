@@ -4,6 +4,7 @@ python -m sim.world --seed N --speed 60 [--faults faults.yaml] [--hours H]
 """
 
 import argparse
+import signal
 from pathlib import Path
 
 import simpy
@@ -17,7 +18,15 @@ from sim.params import load_sim_config
 from sim.run import write_run
 
 
+def _raise_interrupt(signum: int, frame: object) -> None:
+    raise KeyboardInterrupt
+
+
 def main() -> None:
+    # A background shell job starts with SIGINT ignored, so Python would never raise
+    # KeyboardInterrupt; install the handler explicitly for both signals.
+    signal.signal(signal.SIGINT, _raise_interrupt)
+    signal.signal(signal.SIGTERM, _raise_interrupt)
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--speed", type=float, default=60.0)

@@ -147,7 +147,7 @@ cloud→fog: `emtra.recommendations.v1`, `emtra.recoveries.v1` (alert_id), `emtr
 |---|---|---|
 | `stops` | stop_id, name, lat, lon, stop_sequence, segment_id | carga inicial |
 | `schedule` | horario de §2 | carga inicial |
-| `estimates` (hypertable `polled_at`) | polled_at, stop_id, line_id, direction_id, bus_id, time_left_s, distance_m | Ingestor |
+| `estimates` (hypertable `polled_at`) | polled_at, stop_id, line_id, direction_id, bus_id, time_left_s, distance_m; `UNIQUE (stop_id, line_id, bus_id, polled_at)` (clave natural; incluye la columna de partición, y `direction_id` es función de `line_id`). El Ingestor inserta con `ON CONFLICT DO NOTHING` | Ingestor |
 | `arrivals` (hypertable `arrival_time`) | payload + `msg_id`; `UNIQUE (msg_id, arrival_time)` (una hypertable exige la columna de partición en el índice único; `arrival_time` es función de la clave natural, así que deduplica igual) | Ingestor |
 | `never_fulfilled` | payload + msg_id | Ingestor |
 | `band_status` | payload; PK (line_id, direction_id, segment_id, band_start) | Monitor |

@@ -22,7 +22,12 @@ def _start_ingestor() -> subprocess.Popen:
 
 def _stop(p: subprocess.Popen) -> None:
     p.send_signal(signal.SIGINT)
-    p.wait(timeout=30)
+    try:
+        p.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        p.kill()  # never leave an orphan: two Ingestors share a client_id and break the test
+        p.wait()
+        raise
 
 
 def _count(sql: str = "SELECT count(*) FROM estimates") -> int:
@@ -42,7 +47,22 @@ def _settle() -> None:
     raise AssertionError("ingestor never settled")
 
 
+def _reset_mqtt_session() -> None:
+    """Drop the Ingestor's persistent session: QoS 1 messages queued by earlier worlds."""
+    import paho.mqtt.client as mqtt
+
+    from emtra_common import mqtt as emqtt
+
+    c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="ingestor", clean_session=True)
+    emqtt.connect(c)
+    c.loop_start()
+    time.sleep(1)
+    c.loop_stop()
+    c.disconnect()
+
+
 def _clean_db() -> None:
+    _reset_mqtt_session()
     apply_migrations()
     with connect(autocommit=True) as c:
         c.execute("TRUNCATE estimates, arrivals, never_fulfilled")
@@ -92,3 +112,27 @@ def test_restart_no_duplicates(tmp_path):
     assert _count("SELECT count(*) FROM arrivals") > 0
     assert _count("SELECT count(*) FROM (SELECT msg_id FROM arrivals GROUP BY msg_id "
                   "HAVING count(*) > 1) d") == 0
+
+
+def test_estimates_insert_is_idempotent():
+    from services.ingestor.__main__ import INSERT_ESTIMATE
+
+    _clean_db()
+    row = ("2026-11-16T06:00:30Z", "S04", "19", 0, "B19-001", 120, 600)
+    with connect(autocommit=True) as c:
+        for _ in range(2):
+            c.execute(INSERT_ESTIMATE, row)
+        assert c.execute("SELECT count(*) FROM estimates").fetchone()[0] == 1  # type: ignore[index]
+
+
+@pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGINT])
+def test_world_closes_clean_on_signal(tmp_path, sig):
+    """A background job (SIGINT ignored, as a shell leaves it) still writes runs/ and exits 0."""
+    out = tmp_path / "w"
+    p = subprocess.Popen(
+        [sys.executable, "-m", "sim.world", "--seed", "42", "--speed", "60", "--out", str(out)],
+        cwd=ROOT, preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
+    time.sleep(8)
+    p.send_signal(sig)
+    assert p.wait(timeout=30) == 0
+    assert (out / "manifest.json").exists() and (out / "truth_arrivals.parquet").exists()

@@ -166,3 +166,39 @@ def test_msg_ids_deterministic(run3h, tmp_path_factory):
     ids = _msg_ids(run3h)
     assert ids and ids == _msg_ids(again)
     assert len(set(ids)) == len(ids)
+
+
+def test_breakdown_emits_never_fulfilled(tmp_path_factory):  # K3 with a real withdrawal
+    d = run_sim(seed=3000, hours=4, out=tmp_path_factory.mktemp("bd"),
+                faults=[{"type": "breakdown", "severity": "high", "t0": "08:00", "line_id": "19"}])
+    run_batch(d)
+    tr = pd.read_parquet(d / "truth_arrivals.parquet")
+    ar = pd.read_parquet(d / "arrivals.parquet")
+    nf = pd.read_parquet(d / "never_fulfilled.parquet")
+    es = pd.read_parquet(d / "estimates.parquet")
+    end = pd.read_parquet(d / "watermarks.parquet").watermark.max()
+    # the broken bus: a line-19 bus whose last true arrival is short of the line's end, long ago
+    last = tr[tr.line_id == "19"].groupby("bus_id").agg(seq=("stop_sequence", "max"),
+                                                       t=("arrival_time", "max"))
+    broken = last[(last.seq < 12) & (last.t < end - pd.Timedelta(minutes=30))]
+    assert len(broken) == 1
+    bus = broken.index[0]
+    fail_seq = int(broken.seq.iloc[0]) + 1                      # the stop it never reached
+    fail_stop = STOPS[fail_seq - 1]
+    # downstream stops with a pending estimate when the bus vanished
+    t_last = es[es.bus_id == bus].polled_at.max()
+    pending = set(es[(es.bus_id == bus) & (es.polled_at == t_last)].stop_id) - {fail_stop}
+    assert len(pending) >= 3
+    mine = nf[nf.bus_id == bus]
+    assert set(mine.stop_id) == pending
+    assert (mine.last_seen_at == t_last).all()
+    # no derived arrival for that bus downstream of the failure
+    assert not ((ar.bus_id == bus) & (ar.stop_id.map(STOPS.index) >= fail_seq)).any()
+    # K3 here: never fulfilled that had a true arrival; and false derived arrivals overall
+    key = ["stop_id", "line_id", "bus_id"]
+    assert len(nf.merge(tr[key].drop_duplicates(), on=key)) <= 0.01 * len(nf)
+    m = ar.merge(tr[[*key, "arrival_time"]], on=key, how="left", suffixes=("", "_true"))
+    err = (m.arrival_time - m.arrival_time_true).abs().dt.total_seconds()
+    false = m[err.isna() | (err > 30)]
+    # one is unavoidable: at the failure stop the last sighting (26 s) looks like a normal arrival
+    assert set(zip(false.bus_id, false.stop_id, strict=True)) <= {(bus, fail_stop)}

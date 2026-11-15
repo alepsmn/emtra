@@ -1,5 +1,6 @@
 """Live Ingestor: MQTT raw snapshots -> FogStore + MQTT (python -m services.ingestor)."""
 
+import signal
 import time
 from datetime import UTC, datetime
 
@@ -14,7 +15,7 @@ from services.ingestor.sources import MqttSource
 PRODUCER = "ingestor"
 
 INSERT_ESTIMATE = ("INSERT INTO estimates (polled_at, stop_id, line_id, direction_id, bus_id, "
-                   "time_left_s, distance_m) VALUES (%s,%s,%s,%s,%s,%s,%s)")
+                   "time_left_s, distance_m) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING")
 INSERT_ARRIVAL = ("INSERT INTO arrivals (msg_id, line_id, direction_id, stop_id, stop_sequence, "
                   "bus_id, arrival_time, uncertainty_s, last_seen_at, first_missing_at) "
                   "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING")
@@ -23,7 +24,14 @@ INSERT_NF = ("INSERT INTO never_fulfilled (msg_id, line_id, direction_id, stop_i
              "ON CONFLICT DO NOTHING")
 
 
+def _raise_interrupt(signum: int, frame: object) -> None:
+    raise KeyboardInterrupt
+
+
 def main() -> None:
+    # Background jobs start with SIGINT ignored; handle both signals explicitly.
+    signal.signal(signal.SIGINT, _raise_interrupt)
+    signal.signal(signal.SIGTERM, _raise_interrupt)
     source = MqttSource()
     pub = emqtt.make_client("ingestor-pub")
     emqtt.connect(pub)
