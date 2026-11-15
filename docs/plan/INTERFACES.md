@@ -30,6 +30,8 @@ lines:
   - line_id: "170"                # LF (headway 20 min), comparte S01..S08
     ...
 control_points: [S04, S08]        # paradas donde se puede retener
+hf_max_headway_s: 600             # headway <= esto -> HF (c_vh); más -> LF (OTP)
+synthetic: true
 ```
 
 - Una terna (línea, sentido, tramo) existe si la línea sirve ≥ 3 paradas del tramo.
@@ -146,7 +148,7 @@ cloud→fog: `emtra.recommendations.v1`, `emtra.recoveries.v1` (alert_id), `emtr
 | `stops` | stop_id, name, lat, lon, stop_sequence, segment_id | carga inicial |
 | `schedule` | horario de §2 | carga inicial |
 | `estimates` (hypertable `polled_at`) | polled_at, stop_id, line_id, direction_id, bus_id, time_left_s, distance_m | Ingestor |
-| `arrivals` (hypertable `arrival_time`) | payload + `msg_id UNIQUE` | Ingestor |
+| `arrivals` (hypertable `arrival_time`) | payload + `msg_id`; `UNIQUE (msg_id, arrival_time)` (una hypertable exige la columna de partición en el índice único; `arrival_time` es función de la clave natural, así que deduplica igual) | Ingestor |
 | `never_fulfilled` | payload + msg_id | Ingestor |
 | `band_status` | payload; PK (line_id, direction_id, segment_id, band_start) | Monitor |
 | `alerts` | payload; PK alert_id; índice único parcial `WHERE state='open'` sobre (line_id, direction_id, segment_id) | Monitor |
@@ -164,9 +166,9 @@ Carga inicial: `python -m emtra_common.reference load` (stops + schedule), la ej
 |---|---|
 | `clock.py` | `Clock` (protocolo `now()`), `SystemClock`, `ManualClock` |
 | `rng.py` | `rng(root_seed: int, stream: str, *key) -> np.random.Generator`. Implementación: `SeedSequence([root_seed, *words])`, `words` = 4 enteros de 32 bits de `blake2b(repr((stream, *key)))`. Mismo resultado en cualquier proceso |
-| `bands.py` | `band_start(ts)`, `band_group(ts)`, `horizon_band(tau_s)` → `"0-3"\|"3-6"\|"6-12"\|"12-30"\|None`, `los_cvh(x)`, `los_otp(x)` |
+| `bands.py` | (límites y LOS en `config/bands.yaml`) `band_start(ts)`, `band_end(ts)`, `los_status(los)` → inside/warning/outside, `band_group(ts)`, `horizon_band(tau_s)` → `"0-3"\|"3-6"\|"6-12"\|"12-30"\|None`, `los_cvh(x)`, `los_otp(x)` |
 | `corridor.py` | modelo y carga de §1; `segment_of(stop_id)`, `lines_in_segment(segment_id)` |
-| `timetable.py` | §2; `scheduled_headway(line, stop, band_start)`, `line_type(line, band_group)` → `"HF"\|"LF"` |
+| `timetable.py` | §2; `scheduled_headway(line, stop, band_start)`, `line_type(line, band_group)` → `"HF"\|"LF"` (ambas con `corridor=None` opcional = c19). Llegada en la parada k-ésima servida = salida + k·(enlace + dwell) |
 | `config.py` | carga YAML → pydantic |
 | `holding.py` | regla de retención (WP4): `hold_s = clip(alpha * (H - h_fwd), 0, hold_max_s)` |
 | `mqtt.py`, `db.py`, `health.py` | ayudas finas de conexión y latido |

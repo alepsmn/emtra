@@ -1,0 +1,32 @@
+# Band helpers (INTERFACES section 7). Times are Europe/Madrid.
+timezone: Europe/Madrid
+band_minutes: 15
+groups:            # [start_hour, end_hour)
+  early: [6, 7]
+  am_peak: [7, 10]
+  midday: [10, 16]
+  pm_peak: [16, 20]
+  evening: [20, 24]
+horizon_bands:     # [lower_s, upper_s), label
+  - [0, 180, "0-3"]
+  - [180, 360, "3-6"]
+  - [360, 720, "6-12"]
+  - [720, 1800, "12-30"]
+# Level of service (H3 Table 12, closed upper limits up to B; see DEVIATIONS 8).
+# c_vh: first class whose limit is met. `strict: true` means value < limit.
+los_cvh:
+  - {los: A, limit: 0.21, strict: false}
+  - {los: B, limit: 0.30, strict: false}
+  - {los: C, limit: 0.40, strict: true}
+  - {los: D, limit: 0.53, strict: true}
+  - {los: E, limit: 0.75, strict: true}
+  - {los: F, limit: null, strict: false}
+# OTP: first class whose minimum is met (value >= minimum).
+los_otp:
+  - {los: A, minimum: 0.95}
+  - {los: B, minimum: 0.90}
+  - {los: C, minimum: 0.85}
+  - {los: D, minimum: 0.80}
+  - {los: E, minimum: 0.75}
+  - {los: F, minimum: null}
+los_status: {A: inside, B: inside, C: warning, D: outside, E: outside, F: outside}

@@ -11,10 +11,11 @@ lint:
 
 # unit tests only (no Docker); also runs the acceptance tests that need none
 test:
-	uv run pytest tests/unit tests/acceptance -q
+	uv run pytest tests/unit tests/acceptance -q -m "not integration"
 
 it:
-	@echo "TODO WP5: integration tests"
+	$(COMPOSE) up -d --wait --wait-timeout 90
+	uv run pytest tests -q -m integration
 
 # usage: make accept WP=03
 accept:

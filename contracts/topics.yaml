@@ -1,0 +1,26 @@
+# INTERFACES section 5. The bridge generates its routes from here.
+mqtt_prefix: "emtra/v1/"
+mqtt:   # QoS 1, persistent sessions
+  - {name: sim_raw,         pattern: "sim/raw/{stop_id}",                                schema_name: null,                           producer: World,    consumers: [Ingestor],                         retained: false, kafka: null}
+  - {name: snapshots,       pattern: "fog/snapshots/{stop_id}",                          schema_name: emtra.snapshot,               producer: Ingestor, consumers: [Bridge],                           retained: false, kafka: {topic: emtra.snapshots.v1, direction: fog_to_cloud}}
+  - {name: arrivals,        pattern: "fog/arrivals/{line_id}/{direction_id}",            schema_name: emtra.arrival,                producer: Ingestor, consumers: [Monitor, Bridge],                  retained: false, kafka: {topic: emtra.arrivals.v1, direction: fog_to_cloud}}
+  - {name: never_fulfilled, pattern: "fog/never_fulfilled/{line_id}/{direction_id}",    schema_name: emtra.never_fulfilled,        producer: Ingestor, consumers: [Bridge],                           retained: false, kafka: {topic: emtra.never_fulfilled.v1, direction: fog_to_cloud}}
+  - {name: watermark,       pattern: "fog/watermark",                                    schema_name: emtra.watermark,              producer: Ingestor, consumers: [Monitor],                          retained: false, kafka: null}
+  - {name: status,          pattern: "fog/status/{line_id}/{direction_id}/{segment_id}", schema_name: emtra.band_status,            producer: Monitor,  consumers: [Bridge, PassengerInfo],            retained: true,  kafka: {topic: emtra.status.v1, direction: fog_to_cloud}}
+  - {name: alerts,          pattern: "fog/alerts/{line_id}/{direction_id}",              schema_name: emtra.alert,                  producer: Monitor,  consumers: [Bridge],                           retained: false, kafka: {topic: emtra.alerts.v1, direction: fog_to_cloud}}
+  - {name: rec_requests,    pattern: "fog/rec_requests/{alert_id}",                      schema_name: emtra.recommendation_request, producer: Monitor,  consumers: [Bridge],                           retained: false, kafka: {topic: emtra.rec_requests.v1, direction: fog_to_cloud}}
+  - {name: recommendations, pattern: "fog/recommendations/{alert_id}",                   schema_name: emtra.recommendation,         producer: Bridge,   consumers: [Monitor],                          retained: false, kafka: {topic: emtra.recommendations.v1, direction: cloud_to_fog}}  # also published by Monitor (fallback)
+  - {name: decisions,       pattern: "fog/decisions/{alert_id}",                         schema_name: emtra.decision,               producer: OperatorAPI, consumers: [Monitor, Bridge, World],        retained: false, kafka: {topic: emtra.decisions.v1, direction: fog_to_cloud}}
+  - {name: recoveries,      pattern: "fog/recoveries/{alert_id}",                        schema_name: emtra.recovery,               producer: Bridge,   consumers: [Monitor],                          retained: false, kafka: {topic: emtra.recoveries.v1, direction: cloud_to_fog}}
+  - {name: calibration,     pattern: "calibration/current",                              schema_name: emtra.calibration,            producer: Bridge,   consumers: [PassengerInfo],                    retained: true,  kafka: {topic: emtra.calibration.v1, direction: cloud_to_fog}}
+kafka:   # 1 partition per topic; key template in braces
+  - {topic: emtra.snapshots.v1,       key: "{stop_id}",                   direction: fog_to_cloud}
+  - {topic: emtra.arrivals.v1,        key: "{line_id}:{direction_id}",    direction: fog_to_cloud}
+  - {topic: emtra.never_fulfilled.v1, key: "{line_id}:{direction_id}",    direction: fog_to_cloud}
+  - {topic: emtra.status.v1,          key: "{line_id}:{direction_id}",    direction: fog_to_cloud}
+  - {topic: emtra.alerts.v1,          key: "{line_id}:{direction_id}",    direction: fog_to_cloud}
+  - {topic: emtra.rec_requests.v1,    key: "{alert_id}",                  direction: fog_to_cloud}
+  - {topic: emtra.decisions.v1,       key: "{alert_id}",                  direction: fog_to_cloud}
+  - {topic: emtra.recommendations.v1, key: "{alert_id}",                  direction: cloud_to_fog}
+  - {topic: emtra.recoveries.v1,      key: "{alert_id}",                  direction: cloud_to_fog}
+  - {topic: emtra.calibration.v1,      key: "current",                    direction: cloud_to_fog}
