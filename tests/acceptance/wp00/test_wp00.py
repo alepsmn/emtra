@@ -1,9 +1,6 @@
 import re
-import shutil
 import subprocess
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -29,7 +26,6 @@ def test_makefile_has_all_targets():
     assert expected <= defined, expected - defined
 
 
-@pytest.mark.skipif(shutil.which("docker") is None, reason="docker not installed")
 def test_compose_is_valid():
     r = subprocess.run(
         ["docker", "compose", "-f", str(ROOT / "infra" / "docker-compose.yml"), "config"],
