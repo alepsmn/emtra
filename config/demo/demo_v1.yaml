@@ -1,0 +1,17 @@
+# Demo v1 (WP5): `make demo-v1`. Scenario faults live in faults_v1.yaml (single source for the checks).
+seed: 42                  # data_split.yaml: demo
+speed: 60                 # simulated seconds per wall-clock second
+start: "07:00"            # Madrid time on the service date
+hours: 3.25               # 07:00-10:00 plus the lateness tail that closes the 09:45 band
+faults: config/demo/faults_v1.yaml
+services: [ingestor, reliability_monitor]   # must report `ok` in service_health
+ready_grace_s: 3          # after the services report, time for their MQTT subscriptions
+settle_stable_s: 5        # FogStore counts unchanged this long = the services have drained
+settle_timeout_s: 90
+check:
+  line_id: "19"
+  window: ["07:00", "10:00"]      # bands expected for the line, in both segments
+  expected_bands: 12
+  detection_window_min: 60        # an action_required alert must open within this of the fault
+  health_max_age_s: 30            # `ok` and updated within this = online (3 heartbeats)
+dashboard_url: http://localhost:3000/d/emtra-operator

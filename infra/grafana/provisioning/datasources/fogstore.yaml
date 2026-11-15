@@ -2,14 +2,16 @@ apiVersion: 1
 datasources:
   - name: FogStore
     uid: fogstore
-    type: postgres
+    type: grafana-postgresql-datasource
     access: proxy
     url: timescaledb:5432
-    user: emtra
+    user: grafana_ro          # read-only role (migration 006)
+    editable: false
     jsonData:
       database: emtra
       sslmode: disable
+      postgresVersion: 1600
       timescaledb: true
     secureJsonData:
-      password: emtra
+      password: grafana_ro
     isDefault: true

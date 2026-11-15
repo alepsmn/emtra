@@ -1,6 +1,6 @@
 """Live world: the same engine on a real-time SimPy environment, publishing snapshots on MQTT.
 
-python -m sim.world --seed N --speed 60 [--faults faults.yaml] [--hours H]
+python -m sim.world --seed N --speed 60 [--faults faults.yaml] [--start HH:MM] [--hours H]
 """
 
 import argparse
@@ -10,7 +10,7 @@ from pathlib import Path
 import simpy
 
 from emtra_common.config import ROOT
-from emtra_common.corridor import load_corridor
+from emtra_common.corridor import load_corridor, service_datetime
 from emtra_common.mqtt import connect, make_client
 from sim.engine import Engine
 from sim.faults import load_faults
@@ -30,6 +30,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--speed", type=float, default=60.0)
+    ap.add_argument("--start", default=None, help="HH:MM Madrid time, band-aligned")
     ap.add_argument("--hours", type=float, default=None)
     ap.add_argument("--faults", default=None)
     ap.add_argument("--out", default=None)
@@ -44,7 +45,9 @@ def main() -> None:
         client.publish(f"emtra/v1/sim/raw/{stop_id}", line, qos=1)
 
     env = simpy.rt.RealtimeEnvironment(factor=1 / a.speed, strict=False)
-    eng = Engine(load_corridor(), load_sim_config(), a.seed, faults=specs, env=env,
+    corridor = load_corridor()
+    start = service_datetime(corridor, a.start) if a.start else None
+    eng = Engine(corridor, load_sim_config(), a.seed, faults=specs, env=env, start=start,
                  horizon_s=None if a.hours is None else a.hours * 3600, on_snapshot=publish)
     eng.collector_id = f"sim-{out.name}"
     try:

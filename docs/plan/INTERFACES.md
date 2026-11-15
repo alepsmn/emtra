@@ -160,6 +160,8 @@ Vistas para Grafana: `v_line_status_latest`, `v_open_alerts`, `v_alert_timeline`
 
 Carga inicial: `python -m emtra_common.reference load` (stops + schedule), la ejecuta `make up`.
 
+Rol `grafana_ro` (migración `006_grafana_readonly.sql`): solo `SELECT` sobre todas las tablas y vistas; lo usa el datasource de Grafana.
+
 ## 7. Módulos compartidos (`emtra_common/`)
 
 | Módulo | API |

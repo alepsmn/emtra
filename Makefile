@@ -24,12 +24,14 @@ accept:
 
 up:
 	$(COMPOSE) up -d --wait --wait-timeout 90
+	uv run python -m emtra_common.reference load
 
 down:
+	scripts/demo_v1.sh stop
 	$(COMPOSE) down
 
 demo-v1:
-	@echo "TODO WP5"
+	scripts/demo_v1.sh
 
 experiments:
 	@echo "TODO WP6"

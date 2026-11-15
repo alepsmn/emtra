@@ -1,8 +1,9 @@
 """Corridor model and loader (INTERFACES section 1)."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 from functools import lru_cache
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -115,3 +116,11 @@ class Corridor(BaseModel):
 @lru_cache
 def load_corridor(path: Path | str | None = None) -> Corridor:
     return load_model(path or CONFIG_DIR / "corridors" / "c19.yaml", Corridor)
+
+
+def service_datetime(corridor: Corridor, hhmm: str) -> datetime:
+    """UTC instant of "HH:MM" local time on the corridor's service date."""
+    h, m = map(int, hhmm.split(":"))
+    d = corridor.service_date
+    local = datetime(d.year, d.month, d.day, h, m, tzinfo=ZoneInfo(corridor.timezone))
+    return local.astimezone(UTC)

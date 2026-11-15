@@ -46,4 +46,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["integration: needs the docker compose stack (make up)"]
+markers = [
+    "integration: needs the docker compose stack (make up)",
+    "slow: runs a multi-minute scenario",
+]

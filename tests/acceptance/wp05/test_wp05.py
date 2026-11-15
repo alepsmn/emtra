@@ -11,14 +11,13 @@ import signal
 import subprocess
 import sys
 import time
-from pathlib import Path
 
 import paho.mqtt.client as mqtt
 import psycopg
 import pytest
 
 from emtra_common import mqtt as emqtt
-from emtra_common.config import ROOT, load_infra
+from emtra_common.config import ROOT
 from emtra_common.corridor import load_corridor, service_datetime
 from emtra_common.db import MIGRATIONS_DIR, connect
 
@@ -128,7 +127,8 @@ def test_demo_v1_end_to_end(demo_runs):
 @pytest.mark.slow
 def test_demo_v1_repeatable(demo_runs):
     """Two runs in a row from the same command give the same FogStore content."""
-    assert len(demo_runs) == 2 and all(r["returncode"] == 0 for r in demo_runs), demo_runs[-1]["tail"]
+    assert len(demo_runs) == 2 and all(r["returncode"] == 0 for r in demo_runs), \
+        demo_runs[-1]["tail"]
     a, b = (r["fingerprint"] for r in demo_runs)
     assert a is not None and a["counts"]["band_status"] > 0
     assert a == b
