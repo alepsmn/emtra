@@ -100,60 +100,6 @@ def test_grafana_role_is_read_only():
                       "VALUES ('x', 'ok', now())")
 
 
-# ---------------------------------------------------------------- demo runs (shared fixture)
-
-@pytest.fixture(scope="module")
-def demo_runs() -> list[dict]:
-    """Run scripts/demo_v1.sh twice in a row (the second only if the first succeeded)."""
-    runs: list[dict] = []
-    for _ in range(2):
-        FINGERPRINT.unlink(missing_ok=True)
-        p = subprocess.run([str(DEMO_SH)], cwd=ROOT, capture_output=True, text=True, timeout=900)
-        fp = json.loads(FINGERPRINT.read_text()) if FINGERPRINT.exists() else None
-        runs.append({"returncode": p.returncode, "tail": (p.stdout + p.stderr)[-3000:],
-                     "fingerprint": fp})
-        if p.returncode != 0:
-            break
-    return runs
-
-
-@pytest.mark.integration
-@pytest.mark.slow
-def test_demo_v1_end_to_end(demo_runs):
-    assert demo_runs[0]["returncode"] == 0, demo_runs[0]["tail"]
-
-
-@pytest.mark.integration
-@pytest.mark.slow
-def test_demo_v1_repeatable(demo_runs):
-    """Two runs in a row from the same command give the same FogStore content."""
-    assert len(demo_runs) == 2 and all(r["returncode"] == 0 for r in demo_runs), \
-        demo_runs[-1]["tail"]
-    a, b = (r["fingerprint"] for r in demo_runs)
-    assert a is not None and a["counts"]["band_status"] > 0
-    assert a == b
-
-
-@pytest.mark.integration
-@pytest.mark.slow
-def test_panel_queries_run(demo_runs):
-    """Every panel query runs against the populated FogStore, as the read-only role, in < 2 s."""
-    assert demo_runs[0]["returncode"] == 0, demo_runs[0]["tail"]
-    d = _dashboard()
-    with psycopg.connect(RO_DSN, autocommit=True) as c:
-        for title, sql in _queries(d):
-            for line, segment in (("19", "1"), ("19", "2"), ("170", "1")):
-                t0 = time.perf_counter()
-                rows = c.execute(_render(sql, line, segment)).fetchall()  # type: ignore[call-overload]
-                assert time.perf_counter() - t0 < 2, (title, line, segment)
-                if title != "Alertas abiertas":  # may legitimately be empty at the end
-                    assert rows or title.startswith("Indicador"), (title, line, segment)
-        # the indicator panel has data for line 19 (c_vh) and for 170 (OTP)
-        ind = [s for t, s in _queries(d) if t == "Indicador en el tiempo"]
-        assert any(c.execute(_render(s, "19", "1")).fetchall() for s in ind)
-        assert any(c.execute(_render(s, "170", "1")).fetchall() for s in ind)
-
-
 # ---------------------------------------------------------------- clean start
 
 def test_service_datetime():
@@ -250,3 +196,59 @@ def test_stop_kills_leftover_processes():
         for p in procs:
             if p.poll() is None:
                 p.send_signal(signal.SIGKILL)
+
+
+# Demo tests go last: they leave the stack up with the demo populated (the clean-start tests
+# above empty it).
+# ---------------------------------------------------------------- demo runs (shared fixture)
+
+@pytest.fixture(scope="module")
+def demo_runs() -> list[dict]:
+    """Run scripts/demo_v1.sh twice in a row (the second only if the first succeeded)."""
+    runs: list[dict] = []
+    for _ in range(2):
+        FINGERPRINT.unlink(missing_ok=True)
+        p = subprocess.run([str(DEMO_SH)], cwd=ROOT, capture_output=True, text=True, timeout=900)
+        fp = json.loads(FINGERPRINT.read_text()) if FINGERPRINT.exists() else None
+        runs.append({"returncode": p.returncode, "tail": (p.stdout + p.stderr)[-3000:],
+                     "fingerprint": fp})
+        if p.returncode != 0:
+            break
+    return runs
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+def test_demo_v1_end_to_end(demo_runs):
+    assert demo_runs[0]["returncode"] == 0, demo_runs[0]["tail"]
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+def test_demo_v1_repeatable(demo_runs):
+    """Two runs in a row from the same command give the same FogStore content."""
+    assert len(demo_runs) == 2 and all(r["returncode"] == 0 for r in demo_runs), \
+        demo_runs[-1]["tail"]
+    a, b = (r["fingerprint"] for r in demo_runs)
+    assert a is not None and a["counts"]["band_status"] > 0
+    assert a == b
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+def test_panel_queries_run(demo_runs):
+    """Every panel query runs against the populated FogStore, as the read-only role, in < 2 s."""
+    assert demo_runs[0]["returncode"] == 0, demo_runs[0]["tail"]
+    d = _dashboard()
+    with psycopg.connect(RO_DSN, autocommit=True) as c:
+        for title, sql in _queries(d):
+            for line, segment in (("19", "1"), ("19", "2"), ("170", "1")):
+                t0 = time.perf_counter()
+                rows = c.execute(_render(sql, line, segment)).fetchall()  # type: ignore[call-overload]
+                assert time.perf_counter() - t0 < 2, (title, line, segment)
+                if title != "Alertas abiertas":  # may legitimately be empty at the end
+                    assert rows or title.startswith("Indicador"), (title, line, segment)
+        # the indicator panel has data for line 19 (c_vh) and for 170 (OTP)
+        ind = [s for t, s in _queries(d) if t == "Indicador en el tiempo"]
+        assert any(c.execute(_render(s, "19", "1")).fetchall() for s in ind)
+        assert any(c.execute(_render(s, "170", "1")).fetchall() for s in ind)

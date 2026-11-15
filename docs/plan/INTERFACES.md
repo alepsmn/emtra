@@ -219,6 +219,6 @@ Misma lógica (`core`) que el servicio en vivo. Un test de integración por serv
 | Línea base de detectores (20 días limpios) | 1000–1019 |
 | Calibración del intervalo F12 | 2000–2019 |
 | Validación / experimentos | 3000 en adelante |
-| Demo | 42 |
+| Demo | 51 (elegida con `scripts/wp05_seed_selection.py`; ver REPORT de WP5) |
 
 Ningún parámetro del sistema se ajusta con semillas de validación.

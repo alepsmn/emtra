@@ -10,7 +10,7 @@
   "timezone": "Europe/Madrid",
   "refresh": "5s",
   "time": {
-    "from": "2026-11-16T05:30:00.000Z",
+    "from": "2026-11-16T06:00:00.000Z",
     "to": "2026-11-16T09:30:00.000Z"
   },
   "templating": {

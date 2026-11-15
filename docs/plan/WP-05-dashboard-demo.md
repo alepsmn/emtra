@@ -3,7 +3,7 @@
 **Hito:** H4 · **Depende de:** WP0–WP4 · **Cierra H4: después de este WP, `make demo-v1` es lo que se graba.**
 
 ## 5.1 Dashboard (`infra/grafana/`)
-Provisionado como código: datasource PostgreSQL de solo lectura sobre FogStore y dashboard `emtra-operator` en JSON. Nada se crea a mano en la UI. Lee FogStore directamente (decisión D11). Zona horaria Europe/Madrid, refresco 5 s.
+Provisionado como código: datasource PostgreSQL de solo lectura sobre FogStore y dashboard `emtra-operator` en JSON. Nada se crea a mano en la UI. Lee FogStore directamente (decisión D11). Zona horaria Europe/Madrid, refresco 5 s, rango por defecto desde las 07:00 simuladas.
 
 Paneles:
 1. **Estado de la red** — tabla línea × tramo con el último estado, coloreada (`v_line_status_latest`).
@@ -17,7 +17,7 @@ Guion fijo, reproducible, ≈ 3 min de reloj:
 
 1. `make down` + volúmenes fuera; `make up` (infra, migraciones, carga de `stops` y `schedule`).
 2. Arranca Ingestor y Monitor con la línea base commiteada.
-3. Arranca el mundo: `--seed 42 --speed 60`, de 07:00 a 10:00 simuladas, con `config/demo/faults_v1.yaml`: un `slowdown` de severidad alta en el tramo 1 a las 08:00 (`{type: slowdown, severity: high, t0: "08:00", segment_id: 1}`).
+3. Arranca el mundo: `--seed 51 --speed 60` (`data_split.yaml`), de 06:00 a 10:15 simuladas (06:00–07:00 es calentamiento y 10:00–10:15 la cola que cierra la última banda; el dashboard muestra desde las 07:00), con `config/demo/faults_v1.yaml`: un `slowdown` de severidad alta en el tramo 1 a las 08:00 (`{type: slowdown, severity: high, t0: "08:00", segment_id: 1}`).
 4. Imprime la URL del dashboard.
 5. Al terminar el mundo, **comprueba** contra FogStore y sale con código ≠ 0 si falla algo:
    - hay `band_status` de las 12 bandas para la línea 19 en ambos tramos;
@@ -26,7 +26,7 @@ Guion fijo, reproducible, ≈ 3 min de reloj:
    - todos los servicios figuran `online` en `service_health`.
 6. Deja el stack levantado para inspección; `make down` lo para.
 
-Si con la semilla 42 el fallo no dispara la alerta, se cambia la semilla o la hora del fallo en `config/demo/` (no los umbrales del monitor) y se anota en el REPORT.
+Si con la semilla de la demo el fallo no dispara la alerta, se cambia la semilla o la hora del fallo en `config/demo/` (no los umbrales del monitor) y se anota en el REPORT.
 
 ## Aceptación (`tests/acceptance/wp05/`)
 ```python

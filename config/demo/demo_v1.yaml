@@ -1,8 +1,8 @@
 # Demo v1 (WP5): `make demo-v1`. Scenario faults live in faults_v1.yaml (single source for the checks).
-seed: 42                  # data_split.yaml: demo
+# seed: data_split.yaml `demo`
 speed: 60                 # simulated seconds per wall-clock second
-start: "07:00"            # Madrid time on the service date
-hours: 3.25               # 07:00-10:00 plus the lateness tail that closes the 09:45 band
+start: "06:00"            # Madrid time on the service date; 06:00-07:00 is warm-up (dashboard shows from 07:00)
+hours: 4.25               # 06:00-10:15: the 10:00 end plus the lateness tail that closes the 09:45 band
 faults: config/demo/faults_v1.yaml
 services: [ingestor, reliability_monitor]   # must report `ok` in service_health
 ready_grace_s: 3          # after the services report, time for their MQTT subscriptions

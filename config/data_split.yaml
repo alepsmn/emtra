@@ -2,4 +2,4 @@
 baseline: {first: 1000, last: 1019}      # clean days for detector baseline
 calibration: {first: 2000, last: 2019}   # F12 interval calibration
 validation_first: 3000                   # validation / experiments: 3000 onwards
-demo: 42
+demo: 51                                 # chosen with scripts/wp05_seed_selection.py (WP5 report)

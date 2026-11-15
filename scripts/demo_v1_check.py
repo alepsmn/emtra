@@ -11,7 +11,7 @@ from datetime import timedelta
 
 from pydantic import BaseModel, ConfigDict
 
-from emtra_common.config import CONFIG_DIR, ROOT, load_model
+from emtra_common.config import CONFIG_DIR, ROOT, load_data_split, load_model
 from emtra_common.corridor import load_corridor, service_datetime
 from emtra_common.db import connect
 from sim.faults import load_faults
@@ -31,7 +31,6 @@ class Checks(BaseModel):
 
 class DemoConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    seed: int
     speed: float
     start: str
     hours: float
@@ -140,8 +139,8 @@ def main() -> None:
     cfg = load_demo()
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "args":
-        print(f"--seed {cfg.seed} --speed {cfg.speed} --start {cfg.start} --hours {cfg.hours} "
-              f"--faults {cfg.faults}")
+        print(f"--seed {load_data_split().demo} --speed {cfg.speed} --start {cfg.start} "
+              f"--hours {cfg.hours} --faults {cfg.faults}")
     elif cmd == "url":
         print(cfg.dashboard_url)
     elif cmd == "ready":
