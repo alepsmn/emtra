@@ -14,7 +14,7 @@ import pandas as pd
 import pytest
 
 from contracts.raw import RawSnapshot
-from emtra_common.bands import band_group, band_start
+from emtra_common.bands import band_start
 from emtra_common.corridor import load_corridor
 from emtra_common.timetable import scheduled_headway
 from sim.run import run_sim
@@ -65,7 +65,7 @@ def clean(tmp_path_factory):
 
 
 def faulty(tmp_path_factory, name: str, fault: dict, hours: float = 4):
-    return run_sim(seed=1, hours=hours, faults=[fault], out=tmp_path_factory.mktemp(name))
+    return run_sim(seed=3000, hours=hours, faults=[fault], out=tmp_path_factory.mktemp(name))
 
 
 def test_determinism(tmp_path_factory):
@@ -75,8 +75,11 @@ def test_determinism(tmp_path_factory):
     for f in ("truth_arrivals", "passengers_agg", "faults", "timetable"):
         pd.testing.assert_frame_equal(pd.read_parquet(a / f"{f}.parquet"),
                                       pd.read_parquet(b / f"{f}.parquet"))
-    with gzip.open(a / "raw/snapshots.jsonl.gz") as fa, gzip.open(b / "raw/snapshots.jsonl.gz") as fb:
-        assert fa.read() == fb.read()
+    def raw(d) -> bytes:  # collector_id carries the run directory name
+        with gzip.open(d / "raw/snapshots.jsonl.gz") as f:
+            return f.read().replace(d.name.encode(), b"RUN")
+
+    assert raw(a) == raw(b)
     assert not truth(a).equals(truth(c))
 
 

@@ -37,6 +37,8 @@ def _cfg() -> BandsConfig:
 
 
 def _local(ts: datetime) -> datetime:
+    if hasattr(ts, "to_pydatetime"):  # pandas Timestamp: drop nanoseconds
+        ts = ts.to_pydatetime(warn=False)
     if ts.tzinfo is None:
         raise ValueError("timestamp must be timezone-aware")
     return ts.astimezone(ZoneInfo(_cfg().timezone))
