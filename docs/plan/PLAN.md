@@ -17,7 +17,7 @@ Un agente, un WP por sesión, en este orden. Cada WP termina con algo ejecutable
 
 | # | Fichero | Hito | Entrega | Hecho |
 |---|---|---|---|---|
-| WP0 | [WP-00-repo.md](WP-00-repo.md) | H4 | repo, Makefile, compose de fog | [ ] |
+| WP0 | [WP-00-repo.md](WP-00-repo.md) | H4 | repo, Makefile, compose de fog | [x] |
 | WP1 | [WP-01-contracts.md](WP-01-contracts.md) | H4 | `contracts/` y `emtra_common/` según INTERFACES | [ ] |
 | WP2 | [WP-02-simulator.md](WP-02-simulator.md) | H4 | simulador de corredor: batch y mundo, fallos, verdad | [ ] |
 | WP3 | [WP-03-ingestor.md](WP-03-ingestor.md) | H4 | F1: llegadas derivadas | [ ] |
