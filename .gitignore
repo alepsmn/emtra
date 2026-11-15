@@ -1,0 +1,22 @@
+# versión antigua del plan y originales sueltos (sustituidos por docs/)
+emtra-plan/
+/EMTRA_H3_revisado*.docx
+/EMTRA_H3_revisado*.pdf
+*:Zone.Identifier
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# artefactos de ejecución
+runs/
+data/
+.env
+*.duckdb
+target/
+dbt_packages/
+logs/

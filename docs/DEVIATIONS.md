@@ -1,0 +1,24 @@
+# Changes with respect to the H3 design
+
+Running log of every point where the prototype departs from, or makes precise, the design delivered in H3. Written in English so each row can be pasted into the technical document. Add a row whenever a contract or a design decision changes (rule 1 of AGENTS.md).
+
+| # | H3 reference | H3 said | Prototype does | Reason |
+|---|---|---|---|---|
+| 1 | §5.11, Table 50; §5.8 step 1 | Simulator fitted to the arrival records captured from the EMT API; F4 and F12 measured on recorded data | Fully synthetic corridor defined in configuration; no real data in the prototype (ADR 0001) | Every measure needs a ground truth to be compared with, which only the simulator provides; the course accepts coherent synthetic data |
+| 2 | D6, Tables 43–45 | GCS for raw data, BigQuery + dbt as warehouse, Airflow for batch jobs | Local directory with the same partition layout, DuckDB + dbt-duckdb, jobs launched with `make` (ADR 0002) | No managed services needed to demonstrate the design; switching back is a change of dbt adapter and path |
+| 3 | §5.5 | Edge, fog and cloud as containers on one virtual machine | Infrastructure (Mosquitto, TimescaleDB, Grafana, Kafka) in Docker Compose on a laptop; EMTRA services as Python processes | Simpler to run and record; tier boundaries are unchanged (the fog reaches the cloud only through the bridge) |
+| 4 | FR03, Ingestor | GTFS timetable loaded daily; incidents, events and weather feeds | Timetable generated from the corridor configuration; context feeds not implemented | Follows from 1; context feeds only serve F5 and F7, which stay as design |
+| 5 | D10 | Polling of the per-stop API in the prototype | `DataSource` interface with file and MQTT implementations fed by the simulator; the live EMT source is designed, not implemented | Follows from 1; the interface that makes the source replaceable is kept |
+| 6 | Annex B.1 | Band closing not specified | The Ingestor publishes a watermark (minimum last poll time over the stops); the ReliabilityMonitor closes a band when the watermark passes its end plus an allowed lateness | With event time, a band with no arrivals would never close and a blocked segment could not be detected |
+| 7 | §3.3 | c_vh defined per stop | Headways of all stops of the segment are pooled in each band; sample standard deviation (n − 1) | One stop yields about two headways per band at 6–8 min headways: too noisy to classify |
+| 8 | Table 12 | Level-of-service limits with gaps between classes (0.30 / 0.31) | Upper limits are inclusive up to B and exclusive from C: A ≤ 0.21, B ≤ 0.30, C < 0.40, D < 0.53, E < 0.75 | Removes the ambiguity for values between two printed limits |
+| 9 | Table 47 | "Action required" when the forecast deviation exceeds the action threshold | "Action required" when the band is outside the range and a detector signals, or the segment is blocked | No deviation forecast exists in the core increment; the rule uses what is measured |
+| 10 | §5.8 step 4 | The disturbance is given to the simulator explicitly (e.g. the broken-down bus removed at t0) | The disturbance is implicit in the corridor state sent with the request (bus positions and gaps); an ongoing slowdown is not known to the planner | The fog does not know the cause of an alert, only what it observes |
+| 11 | §5.8 | Evaluation model fitted independently of the observed world | The ActionPlanner evaluates with the same model that generates the simulated world | Follows from 1. Declared limitation: measured damping is optimistic |
+| 12 | D5, [8] | Daganzo's headway-based holding as fallback | Simplified forward-headway rule: hold = clip(α·(H − h), 0, hold_max) at a control point | Smallest rule that keeps the idea; parameters in configuration |
+| 13 | Table 41 | ActionPlanner ranks hold, short-turn, reinforce, detour and no action | Only hold and no action are evaluated | As planned in §5.11; the rest stays as design |
+| 14 | Messages (Annex C.3) | Message identifier unspecified | Deterministic identifier (UUIDv5 of schema and natural key) | Consumers deduplicate after restarts and replays without extra state |
+| 15 | Recommendation message | Every candidate carries simulated effects | A fallback recommendation carries candidates without simulated measures, flagged `fallback` | The fallback rule does not simulate |
+| 16 | FR17, ConfigurationManager | Configuration changed by the operator and applied without restart | Configuration in versioned YAML files read at start | Designed, not implemented |
+| 17 | §6.2 | "nine non-functional requirements" | Table 38 lists two | Inconsistency in H3 to correct in the text |
+| 18 | §5.11, Table 50 | Increment 1 at H3, increment 2 at H4 | Increment 1 (F1, F3, F9, F6) delivered at H4; increment 2 (F10, F11, F4, F12) at H5 | Milestones shifted by one |
