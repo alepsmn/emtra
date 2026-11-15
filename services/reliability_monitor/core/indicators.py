@@ -100,7 +100,8 @@ class Indicators:
 
     def _otp(self, line_id: str, arrivals: list[Arrival]) -> tuple[float | None, int]:
         """Greedy in time order: each arrival takes the nearest unused scheduled arrival with
-        delta in [-early, +late]; on time means 0 <= delta <= otp_on_time_s."""
+        delta in [-early, +late]; on time means -otp_early_tolerance_s <= delta <=
+        otp_on_time_s."""
         w = self.cfg.otp_match_window_s
         on_time = 0
         for a in arrivals:
@@ -114,7 +115,7 @@ class Indicators:
                 continue
             i = min(free, key=lambda j: abs(t - sched[j]))
             used.add(i)
-            on_time += 0 <= t - sched[i] <= self.cfg.otp_on_time_s
+            on_time += -self.cfg.otp_early_tolerance_s <= t - sched[i] <= self.cfg.otp_on_time_s
         if len(arrivals) < self.cfg.min_arrivals:
             return None, len(arrivals)
         return on_time / len(arrivals), len(arrivals)

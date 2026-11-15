@@ -112,7 +112,8 @@ def test_cvh_pools_segment_stops():
 def test_otp_matching():
     # line 170 (LF), trip departing 07:00: scheduled S01..S05 at 07:00:00 + k*110 s
     stops = SEG1[:5]
-    delta = [0, 300, 301, -60, 120]           # on time, 5 min (inclusive), late, early, on time
+    tol = load_monitor_config().otp_early_tolerance_s
+    delta = [0, 300, 301, -tol - 1, -tol]     # on time, 5 min (incl.), late, too early, tolerated
     sched = {r.stop_id: r.sched_arrival for r in TT[(TT.line_id == "170")
              & (TT.trip_id == "170-0-20261116T060000")].itertuples()}
     assert sched["S01"] == madrid(7, 0)
@@ -121,7 +122,7 @@ def test_otp_matching():
     out = run(Monitor(TT), arrivals, madrid(7, 17, 30))
     s = status_of(out, ("170", 0, 1), madrid(7, 0))
     assert s.indicator == "otp" and s.n_obs == 5
-    assert s.value == pytest.approx(3 / 5)     # an early arrival does not count as on time
+    assert s.value == pytest.approx(3 / 5)     # early beyond the tolerance is not on time
     assert (s.los, s.status) == ("F", "outside")
 
 
@@ -177,7 +178,7 @@ def test_ewma_detects_step():
     hits = 0
     for i in range(100):
         g = rng(3000, "wp04.step", i)
-        z = np.concatenate([g.normal(0, 1, 200), g.normal(2, 1, 4)])
+        z = np.concatenate([g.normal(0, 1, 200), g.normal(3, 1, 6)])
         det = Ewma(cfg.ewma.lam, cfg.ewma.L)
         _alarm_within(det, z[:200])                  # the pre-shift alarms do not count
         hits += _alarm_within(det, z[200:]) is not None

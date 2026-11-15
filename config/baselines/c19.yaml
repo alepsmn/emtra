@@ -5,36 +5,36 @@ cells:
   segment_id: 1
   band_group: am_peak
   indicator: otp
-  mu0: 0.24403735632183912
-  sigma0: 0.3205246608960437
+  mu0: 0.02629310344827586
+  sigma0: 0.10673903709409113
   n: 232
 - line_id: '170'
   segment_id: 1
   band_group: early
   indicator: otp
-  mu0: 0.47351598173515974
-  sigma0: 0.4251709497914836
+  mu0: 0.07191780821917806
+  sigma0: 0.17384709988475291
   n: 73
 - line_id: '170'
   segment_id: 1
   band_group: evening
   indicator: otp
-  mu0: 0.45227272727272727
-  sigma0: 0.390101303654881
+  mu0: 0.07837995337995339
+  sigma0: 0.20276773449991453
   n: 286
 - line_id: '170'
   segment_id: 1
   band_group: midday
   indicator: otp
-  mu0: 0.36857562408223205
-  sigma0: 0.3828059238156508
+  mu0: 0.03586637298091042
+  sigma0: 0.12003319285805361
   n: 454
 - line_id: '170'
   segment_id: 1
   band_group: pm_peak
   indicator: otp
-  mu0: 0.2700212992545261
-  sigma0: 0.32265524914573757
+  mu0: 0.024334398296059635
+  sigma0: 0.08908440769303522
   n: 313
 - line_id: '19'
   segment_id: 1
@@ -54,8 +54,8 @@ cells:
   segment_id: 1
   band_group: evening
   indicator: otp
-  mu0: 0.480282708032708
-  sigma0: 0.3211604051407365
+  mu0: 0.09458561808561809
+  sigma0: 0.18259653749040095
   n: 300
 - line_id: '19'
   segment_id: 1
@@ -89,8 +89,8 @@ cells:
   segment_id: 2
   band_group: evening
   indicator: otp
-  mu0: 0.47024881164587046
-  sigma0: 0.32178726967002136
+  mu0: 0.17548028605381547
+  sigma0: 0.2451088431236133
   n: 300
 - line_id: '19'
   segment_id: 2
@@ -124,8 +124,8 @@ cells:
   segment_id: 1
   band_group: evening
   indicator: otp
-  mu0: 0.2883015873015873
-  sigma0: 0.3035461642449983
+  mu0: 0.018095238095238095
+  sigma0: 0.0699293206753068
   n: 300
 - line_id: C1
   segment_id: 1
@@ -159,8 +159,8 @@ cells:
   segment_id: 2
   band_group: evening
   indicator: otp
-  mu0: 0.34926322751322747
-  sigma0: 0.3407073597836619
+  mu0: 0.07981084656084657
+  sigma0: 0.17670158872687222
   n: 300
 - line_id: C1
   segment_id: 2

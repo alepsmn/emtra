@@ -184,6 +184,8 @@ Niveles de servicio (Tabla 12 del H3), límites cerrados por arriba:
 | E | < 0,75 | ≥ 75 % | outside |
 | F | ≥ 0,75 | < 75 % | outside |
 
+OTP: una llegada es puntual si −`otp_early_tolerance_s` ≤ δ ≤ 300 s, con δ = llegada − horario (`config/reliability.yaml`, tolerancia 60 s; DEVIATIONS 24). El resto de llegadas, incluidas las emparejadas con un adelanto mayor, no son puntuales.
+
 ## 8. Salidas de una ejecución (`runs/<run_id>/`)
 
 | Fichero | Columnas | Escribe |

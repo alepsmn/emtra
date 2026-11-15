@@ -3,11 +3,12 @@ allowed_lateness_s: 150      # a band closes when the watermark passes its end b
 min_headways: 6              # c_vh needs at least this many pooled headways in the band
 min_arrivals: 3              # OTP needs at least this many arrivals in the band
 otp_match_window_s: {early: 300, late: 1800}   # a scheduled arrival matches delta in [-early, +late]
-otp_on_time_s: 300           # on time: 0 <= delay <= this
+otp_on_time_s: 300           # on time: -otp_early_tolerance_s <= delay <= this
+otp_early_tolerance_s: 60    # an arrival up to this much ahead of schedule is still on time
 blocked_min_scheduled: 2     # blocked_segment: no arrival of the line in the segment, >= this many scheduled
 close_after_bands: 2         # consecutive inside bands that close an alert
 sigma_floor: 0.02            # lower bound of the baseline sigma0 when computing z
 arl0_target: 2000            # in-control average run length, in bands (tune_detectors.py)
-ewma: {lam: 0.2, L: 3.73}     # L is written by tune_detectors.py
-cusum: {k: 0.5, h: 7.09}      # h is written by tune_detectors.py
+ewma: {lam: 0.2, L: 4.69}     # L is written by tune_detectors.py
+cusum: {k: 0.5, h: 8.87}      # h is written by tune_detectors.py
 shewhart: {z_max: 3.0}       # comparison only (K8)

@@ -16,7 +16,7 @@ Por cada terna (línea, sentido, tramo) existente (INTERFACES §1) y banda cerra
 
 **HF → c_vh.** En cada parada del tramo, headways entre llegadas consecutivas de la misma línea; el headway se asigna a la banda de la llegada posterior. Se juntan los headways de **todas las paradas del tramo**. `d_i = h_obs,i − h_sch,i` con `h_sch` de `emtra_common.timetable.scheduled_headway`. `c_vh = std(d, ddof=1) / mean(h_sch)`. Si `n < min_headways` (default 6) → `insufficient_data`.
 
-**LF → OTP.** Emparejar cada llegada con un horario de la parada (voraz en orden temporal, cada horario una vez, ventana [−5, +30] min). OTP = cuota con 0 ≤ δ ≤ 5 min. Si `n < min_arrivals` (default 3) → `insufficient_data`.
+**LF → OTP.** Emparejar cada llegada con un horario de la parada (voraz en orden temporal, cada horario una vez, ventana [−5, +30] min). OTP = cuota con −`otp_early_tolerance_s` ≤ δ ≤ 300 s (default de la tolerancia: 60 s; DEVIATIONS 24). Si `n < min_arrivals` (default 3) → `insufficient_data`.
 
 Estado y LOS con `emtra_common.bands.los_*` (INTERFACES §7). `distance_to_range` = valor − límite del rango (c_vh) o límite − valor (OTP); positivo = fuera.
 
@@ -49,10 +49,10 @@ Serie por terna: `x_t` = c_vh o `1 − OTP`. `z_t = (x_t − μ₀) / σ₀`, co
 ```python
 def test_cvh_known_values():            # headways iguales al programado -> 0 ; caso a mano con resultado exacto (ddof=1)
 def test_cvh_pools_segment_stops():     # los headways de las 6 paradas entran en el mismo cálculo
-def test_otp_matching():                # 5 programados, 5 observados con δ conocidos -> OTP exacto; llegada adelantada no cuenta
+def test_otp_matching():                # 5 programados, 5 observados con δ conocidos -> OTP exacto; llegada adelantada más allá de la tolerancia no cuenta
 def test_band_closes_on_watermark():    # sin watermark no hay band_status; con él, exactamente uno por terna y banda
 def test_insufficient_data():           # n < mínimo -> status insufficient_data, detectores sin actualizar
-def test_ewma_detects_step():           # z ~ N(0,1) 200 bandas y luego N(2,1): alarma en <= 4 bandas en >= 95 de 100 semillas
+def test_ewma_detects_step():           # z ~ N(0,1) 200 bandas y luego N(3,1): alarma en <= 6 bandas en >= 95 de 100 semillas
 def test_tuned_arl0():                  # con L y h de config, 2000 rachas simuladas de z ~ N(0,1): ARL0 medio >= 0,85 x arl0_target (cada detector)
 def test_single_open_alert():
 def test_alert_closes_after_two_inside_bands():

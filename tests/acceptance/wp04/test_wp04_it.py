@@ -16,7 +16,7 @@ from services.reliability_monitor.batch import run_batch as monitor_batch
 
 pytestmark = pytest.mark.integration
 
-FAULTS = Path(__file__).parent / "faults_it.yaml"   # one high breakdown of line 19 at 06:20
+FAULTS = Path(__file__).parent / "faults_it.yaml"   # one high blocked_segment on segment 1 at 06:05
 
 
 def _start(module: str) -> subprocess.Popen:

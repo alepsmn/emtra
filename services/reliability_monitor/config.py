@@ -34,6 +34,7 @@ class MonitorConfig(_Strict):
     min_arrivals: int
     otp_match_window_s: MatchWindow
     otp_on_time_s: float
+    otp_early_tolerance_s: float
     blocked_min_scheduled: int
     close_after_bands: int
     sigma_floor: float

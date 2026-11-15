@@ -113,7 +113,7 @@ Un WP por sesión, en el orden de `PLAN.md`.
 - **Grupo de banda**: `early` 06–07, `am_peak` 07–10, `midday` 10–16, `pm_peak` 16–20, `evening` 20–24.
 - **HF/LF**: headway programado ≤ 10 min / > 10 min. HF → c_vh; LF → OTP.
 - **c_vh** = σ_d / mean(h_sch), con d_i = h_obs,i − h_sch,i y σ_d desviación típica **muestral** (n−1).
-- **OTP** = cuota de llegadas con 0 ≤ retraso ≤ 5 min.
+- **OTP** = cuota de llegadas con −60 s ≤ retraso ≤ 5 min (la tolerancia de adelanto es `otp_early_tolerance_s` en `config/reliability.yaml`).
 - **EWT** = W_obs − W_sch, con W = Σh² / (2Σh).
 - **Tramo (segment)**: grupo contiguo de paradas del corredor, `segment_id` entero y ordenado.
 - **Llegada derivada**: punto medio entre la última instantánea con el bus acercándose y la primera en que ya no aparece.
