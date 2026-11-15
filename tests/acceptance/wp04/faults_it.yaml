@@ -1,0 +1,2 @@
+faults:
+  - {type: breakdown, severity: high, t0: "06:20", line_id: "19"}
