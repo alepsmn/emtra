@@ -61,10 +61,11 @@ def test_midpoint_rule():
     # (c) disappears far away and reappears within the grace period: nothing, then one arrival
     out = feed(ArrivalDeriver(), [snap("S04", s(0), ("19", "B1", 600)),
                                   snap("S04", s(30)),
-                                  snap("S04", s(60), ("19", "B1", 540)),
-                                  *[snap("S04", s(90 + 30 * i)) for i in range(8)]])
+                                  snap("S04", s(60), ("19", "B1", 60)),
+                                  snap("S04", s(90), ("19", "B1", 30)),
+                                  *[snap("S04", s(120 + 30 * i)) for i in range(8)]])
     assert not of(out, NeverFulfilled)
-    assert len(of(out, Arrival)) == 1 and of(out, Arrival)[0].last_seen_at == s(60)
+    assert len(of(out, Arrival)) == 1 and of(out, Arrival)[0].last_seen_at == s(90)
 
 
 def test_poll_gap_widens_uncertainty():
