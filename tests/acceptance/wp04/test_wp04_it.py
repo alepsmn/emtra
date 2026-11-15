@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from services.reliability_monitor.batch import run_batch as monitor_batch
 
 from emtra_common.config import CONFIG_DIR, ROOT
 from emtra_common.db import apply_migrations, connect
 from services.ingestor.batch import run_batch as ingest_batch
+from services.reliability_monitor.batch import run_batch as monitor_batch
 
 pytestmark = pytest.mark.integration
 

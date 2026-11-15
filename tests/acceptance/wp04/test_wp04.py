@@ -7,13 +7,6 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 import pytest
-from services.reliability_monitor.baseline import Baseline, BaselineCell
-from services.reliability_monitor.batch import replay
-from services.reliability_monitor.batch import run_batch as monitor_batch
-from services.reliability_monitor.config import load_monitor_config
-from services.reliability_monitor.core.alerts import TernAlerts
-from services.reliability_monitor.core.detectors import Cusum, Ewma
-from services.reliability_monitor.core.monitor import Monitor
 
 from contracts.payloads import Alert, Arrival, BandStatus, Watermark
 from emtra_common.config import CONFIG_DIR
@@ -21,6 +14,13 @@ from emtra_common.corridor import load_corridor
 from emtra_common.rng import rng
 from emtra_common.timetable import build_timetable
 from services.ingestor.batch import run_batch as ingest_batch
+from services.reliability_monitor.baseline import Baseline, BaselineCell
+from services.reliability_monitor.batch import replay
+from services.reliability_monitor.batch import run_batch as monitor_batch
+from services.reliability_monitor.config import load_monitor_config
+from services.reliability_monitor.core.alerts import TernAlerts
+from services.reliability_monitor.core.detectors import Cusum, Ewma
+from services.reliability_monitor.core.monitor import Monitor
 from sim.run import run_sim
 
 CORR = load_corridor()
@@ -84,11 +84,12 @@ def hand_case(n_stops: int = 6) -> list[Arrival]:
 
 
 def test_cvh_known_values():
-    # (a) headways equal to the schedule -> c_vh = 0 (band 07:15: every headway is 360 s)
+    # (a) headways equal to the schedule -> c_vh = 0 (band 07:30: past the 06:50 -> 07:00 change
+    # of headway, which the timetable carries downstream with a lag)
     m = Monitor(TT)
-    out = run(m, schedule_feed(madrid(7, 0), madrid(7, 40)), madrid(7, 32, 30))
+    out = run(m, schedule_feed(madrid(7, 0), madrid(7, 50)), madrid(7, 47, 30))
     for tern in [t for t in CORR.terns() if t[0] in ("19", "C1")]:
-        s = status_of(out, tern, madrid(7, 15))
+        s = status_of(out, tern, madrid(7, 30))
         assert s.indicator == "cvh" and s.value == 0.0 and s.los == "A"
         assert s.status == "inside"
     # (b) by hand: d = [-60, 0, 60, 120, -120, 0] -> sum d^2 = 36000, sample std (n-1)
@@ -285,9 +286,9 @@ def test_cvh_vs_truth(clean_days):  # K4
     wm = pd.read_parquet(d / "watermarks.parquet")
     truth_arrivals = [arr(r.line_id, r.stop_id, r.arrival_time.to_pydatetime(), r.bus_id)
                       for r in tr.itertuples()]
-    truth_bs = pd.DataFrame([o.model_dump() for o in replay(
-        Monitor(pd.read_parquet(d / "timetable.parquet")), truth_arrivals,
-        [Watermark(watermark=w.to_pydatetime()) for w in wm.watermark]) if isinstance(o, BandStatus)])
+    out = replay(Monitor(pd.read_parquet(d / "timetable.parquet")), truth_arrivals,
+                 [Watermark(watermark=w.to_pydatetime()) for w in wm.watermark])
+    truth_bs = pd.DataFrame([o.model_dump() for o in out if isinstance(o, BandStatus)])
     key = ["line_id", "direction_id", "segment_id", "band_start"]
     both = sys_bs.merge(truth_bs, on=key, suffixes=("_sys", "_true"))
     both = both[(both.indicator_sys == "cvh") & both.value_sys.notna() & both.value_true.notna()]

@@ -87,3 +87,18 @@ def los_otp(x: float) -> str:
 def los_status(los: str) -> str:
     """inside / warning / outside for a LOS letter."""
     return _cfg().los_status[los]
+
+
+def range_limit(indicator: str) -> float:
+    """Edge of the 'inside' range: the c_vh limit (upper) or the OTP minimum of the worst LOS
+    whose status is inside."""
+    cfg = _cfg()
+    if indicator == "cvh":
+        inside = [c for c in cfg.los_cvh if cfg.los_status[c.los] == "inside"]
+        limit = inside[-1].limit
+        assert limit is not None
+        return limit
+    inside_otp = [c for c in cfg.los_otp if cfg.los_status[c.los] == "inside"]
+    minimum = inside_otp[-1].minimum
+    assert minimum is not None
+    return minimum
