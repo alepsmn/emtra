@@ -1,0 +1,5 @@
+# Local infrastructure endpoints (docker compose, see infra/docker-compose.yml)
+db_dsn: postgresql://emtra:emtra@localhost:5433/emtra
+mqtt_host: localhost
+mqtt_port: 1883
+heartbeat_interval_s: 10

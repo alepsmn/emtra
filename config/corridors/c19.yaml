@@ -1,0 +1,42 @@
+corridor_id: c19
+timezone: Europe/Madrid
+synthetic: true                   # names and coordinates are invented (ADR 0001)
+service_date: 2026-11-16          # Monday; every simulated day is a working day
+service_window: ["06:00", "24:00"]
+hf_max_headway_s: 600             # headway <= this -> HF (c_vh); above -> LF (OTP)
+stops:
+  - {stop_id: "S01", name: "Plaza Mayor", lat: 40.4185, lon: -3.6970, bays: 2}
+  - {stop_id: "S02", name: "Calle Alcala Este", lat: 40.4220, lon: -3.6940, bays: 2}
+  - {stop_id: "S03", name: "Puerta del Sol Norte", lat: 40.4255, lon: -3.6910, bays: 3}
+  - {stop_id: "S04", name: "Gran Via Centro", lat: 40.4290, lon: -3.6880, bays: 2}
+  - {stop_id: "S05", name: "Callao", lat: 40.4325, lon: -3.6850, bays: 2}
+  - {stop_id: "S06", name: "Plaza de Espana", lat: 40.4360, lon: -3.6820, bays: 3}
+  - {stop_id: "S07", name: "Princesa Alta", lat: 40.4395, lon: -3.6790, bays: 2}
+  - {stop_id: "S08", name: "Argüelles", lat: 40.4430, lon: -3.6760, bays: 2}
+  - {stop_id: "S09", name: "Moncloa Sur", lat: 40.4465, lon: -3.6730, bays: 3}
+  - {stop_id: "S10", name: "Paseo Pintor Rosales", lat: 40.4500, lon: -3.6700, bays: 2}
+  - {stop_id: "S11", name: "Ciudad Universitaria", lat: 40.4535, lon: -3.6670, bays: 2}
+  - {stop_id: "S12", name: "Cuatro Caminos", lat: 40.4570, lon: -3.6640, bays: 3}
+segments:
+  - {segment_id: 1, stop_ids: [S01, S02, S03, S04, S05, S06]}
+  - {segment_id: 2, stop_ids: [S07, S08, S09, S10, S11, S12]}
+lines:
+  - line_id: "19"               # HF, whole corridor
+    direction_id: 0
+    enter_stop: S01
+    exit_stop: S12
+    capacity: 80
+    headway_s: {early: 600, am_peak: 360, midday: 480, pm_peak: 360, evening: 720}
+  - line_id: "C1"               # HF, shares S03..S10
+    direction_id: 0
+    enter_stop: S03
+    exit_stop: S10
+    capacity: 80
+    headway_s: {early: 600, am_peak: 450, midday: 540, pm_peak: 450, evening: 720}
+  - line_id: "170"              # LF (20 min), shares S01..S08
+    direction_id: 0
+    enter_stop: S01
+    exit_stop: S08
+    capacity: 60
+    headway_s: {early: 1200, am_peak: 1200, midday: 1200, pm_peak: 1200, evening: 1200}
+control_points: [S04, S08]
