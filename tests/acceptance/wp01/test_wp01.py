@@ -247,6 +247,7 @@ def test_timetable_headways():
     assert line_type("170", "am_peak") == "LF"
     assert line_type("19", "evening") == "LF"  # 720 s > 600 s
     # downstream arrival = departure + k * (link + dwell)
-    t1 = tt[(tt.line_id == "19") & (tt.trip_id == first.iloc[0].trip_id)].sort_values("stop_sequence")
+    trip = tt[tt.trip_id == first.iloc[0].trip_id].sort_values("stop_sequence")
+    t1 = trip
     assert t1.sched_arrival.diff().dropna().eq(timedelta(seconds=110)).all()
     assert tt.equals(build_timetable(c))

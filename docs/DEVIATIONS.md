@@ -22,3 +22,4 @@ Running log of every point where the prototype departs from, or makes precise, t
 | 16 | FR17, ConfigurationManager | Configuration changed by the operator and applied without restart | Configuration in versioned YAML files read at start | Designed, not implemented |
 | 17 | §6.2 | "nine non-functional requirements" | Table 38 lists two | Inconsistency in H3 to correct in the text |
 | 18 | §5.11, Table 50 | Increment 1 at H3, increment 2 at H4 | Increment 1 (F1, F3, F9, F6) delivered at H4; increment 2 (F10, F11, F4, F12) at H5 | Milestones shifted by one |
+| 19 | Annex C (FogStore) | Arrivals stored with a unique message identifier | Unique on (message identifier, arrival time) | A TimescaleDB hypertable requires the partition column in every unique index; the arrival time is a function of the identifier's natural key, so duplicates are still rejected |
