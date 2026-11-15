@@ -9,7 +9,7 @@
 
 ## No hecho / en rojo (con motivo)
 - Nada en rojo: `make lint test` y `make accept WP=02` en verde (10/10).
-- `python -m sim.world` escrito pero **no ejecutado contra un broker** (sin test; se ejercita en WP5). Los 60× no están medidos.
+- `sim.world`: probado con humo manual (ver "Comprobaciones de cierre"), sin test automático. Detiene limpio con `--hours` o Ctrl-C en primer plano; un `SIGTERM` o un `SIGINT` a un proceso en segundo plano lo mata sin escribir `runs/`.
 - `test_breakdown_creates_gap` es estadístico: el hueco es la suma de dos headways vecinos (media 2h, σ≈100 s con la dispersión de salida del spec). En 20 semillas (3000–3019, `breakdown` alta) el máximo en S05 / 360 s fue ≥ 1,8 en 14 (70 %); rango 1,62–2,71. El test usa la semilla 3000 (primera del rango de validación, elegida a priori) y pasa; con otra semilla puede fallar. No se tocó el umbral.
 - `test_no_overtaking_blowup`: máximo headway de la 19 en punta / programado en 20 semillas: 1,8–2,75 (límite 3). Margen escaso.
 
@@ -48,6 +48,11 @@ c_vh medio por línea y grupo de banda, día limpio, 10 semillas (1000–1009), 
 (La 170 es LF: usa OTP, no c_vh. La 19 en punta queda cerca del tope 0,35 del test; la media del test sobre la semilla 1 está dentro del rango.)
 
 Figura de trayectorias (tiempo × parada) de un `breakdown` alta en la línea 19: `docs/plan/reports/figures/wp02_breakdown.png`.
+
+## Comprobaciones de cierre
+1. **Escenario de la demo** (semilla 42, `breakdown` alta, línea 19, t0 08:00; ventana 08:00–10:00 en S05, la parada siguiente al fallo en S04): **cumple**. Hueco máximo 789,6 s = 2,19 × el headway programado (360 s); umbral 1,8. Con arranque a las 07:00 (3 h) el ratio es 2,13. Como control, en las semillas 30–59: 23 de 30 cumplen (fallan 46, 50, 51, 53, 57, con 1,70–1,79).
+2. **Humo de `sim.world`** (`make up`, semilla 42, 60×, suscripción a `emtra/v1/sim/raw/+` 120 s de reloj): llegaron **2878 mensajes** de las 12 paradas (2612 con llegadas); de 05:02:30Z a 07:02:30Z = 7200 s simulados en 120,0 s: **factor medido 60,0×**. Esperado 12 × 240 sondeos = 2880 menos fallos de sondeo. Cierre limpio con `--hours 0.5`: 30 min simulados en 31,6 s de reloj y `runs/` escrito (62 llegadas verdaderas). No se comprobó contra el Ingestor (WP3).
+3. **`band_start` con `pandas.Timestamp`**: no tenía test. Añadido `tests/unit/test_bands_pandas.py` (2 tests); sin el arreglo falla, con él pasa.
 
 ## Filas añadidas a DEVIATIONS.md
 - 20: horario con constantes nominales frente a enlaces por tramo.
