@@ -62,7 +62,7 @@ Lectura:
 - Dependencias nuevas: ninguna.
 
 ## Cómo reproducir (un comando) y cuánto tarda
-`make accept WP=04` — ~95 s si no hay carga (unitarios y simulador ~15 s; integración ~78 s, requiere `make up`). `make test` (sin Docker) ~18 s. Regenerar la línea base: `uv run python -m services.reliability_monitor.baseline` (~26 s). Re-tunear: `uv run python -m services.reliability_monitor.tune_detectors` (~30 s).
+`make accept WP=04` — ~4 min (unitarios y simulador ~15 s; `test_tuned_arl0` ~150 s; integración ~78 s, requiere `make up`). `make test` (sin Docker) ~165 s. **`test_tuned_arl0` se volvió lento** porque con L = 4,69 el ARL₀ sobre N(0,1) es 822 133 bandas y el test simula 2000 rachas de esa longitud (antes, con L = 3,73, ~13 000 y 5 s). Regenerar la línea base: `uv run python -m services.reliability_monitor.baseline` (~26 s). Re-tunear: `uv run python -m services.reliability_monitor.tune_detectors` (~30 s).
 
 ## Resultados medidos (tablas/figuras que sirven al documento)
 **K4 (c_vh del sistema frente a c_vh con llegadas verdaderas)**, un día limpio (semilla 3000), 216 bandas de tramo HF con valor en ambos: MAE = **0,009** (p95 0,024). Objetivo ≤ 0,05. No depende de la tolerancia de OTP.
