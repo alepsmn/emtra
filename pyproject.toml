@@ -1,0 +1,41 @@
+[project]
+name = "emtra"
+version = "0.1.0"
+description = "EMTRA: bus line reliability control, edge-fog-cloud prototype on synthetic data"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2",
+    "pyyaml",
+    "numpy",
+    "pandas",
+    "pyarrow",
+    "scipy",
+    "simpy",
+    "paho-mqtt>=2,<3",
+    "psycopg[binary]>=3",
+    "fastapi",
+    "uvicorn",
+    "httpx",
+    "structlog",
+]
+
+[dependency-groups]
+dev = ["pytest", "ruff", "mypy", "types-pyyaml"]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["emtra-plan"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
