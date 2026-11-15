@@ -30,6 +30,12 @@ RO_DSN = "postgresql://grafana_ro:grafana_ro@localhost:5433/emtra"
 
 # ---------------------------------------------------------------- helpers
 
+@pytest.fixture(scope="module")
+def stack_up() -> None:
+    """The stack up and migrated (make up is idempotent); the demo tests start it themselves."""
+    subprocess.run(["make", "up"], cwd=ROOT, check=True, capture_output=True, timeout=180)
+
+
 def _dashboard() -> dict:
     return json.loads(DASHBOARD.read_text(encoding="utf-8"))
 
@@ -90,7 +96,7 @@ def test_no_estimates_query_without_time_filter():
 
 
 @pytest.mark.integration
-def test_grafana_role_is_read_only():
+def test_grafana_role_is_read_only(stack_up):
     with psycopg.connect(RO_DSN, autocommit=True) as c:
         assert c.execute("SELECT count(*) FROM stops").fetchone() is not None
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
@@ -121,7 +127,7 @@ def test_reset_covers_every_mqtt_client_id():
 
 
 @pytest.mark.integration
-def test_reset_clears_sessions_retained_and_tables():
+def test_reset_clears_sessions_retained_and_tables(stack_up):
     from emtra_common import db
 
     db.apply_migrations()
@@ -178,7 +184,7 @@ def test_reset_clears_sessions_retained_and_tables():
 
 
 @pytest.mark.integration
-def test_stop_kills_leftover_processes():
+def test_stop_kills_leftover_processes(stack_up):
     """`demo_v1.sh stop` (and so the start of the demo) ends EMTRA processes of earlier runs."""
     from emtra_common import db
 
