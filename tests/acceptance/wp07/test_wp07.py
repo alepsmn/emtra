@@ -171,11 +171,14 @@ def test_cloud_to_fog_retained(stack, tmp_path):
         p.produce("emtra.calibration.v1", key="current", value=env.model_dump_json())
         assert p.flush(20) == 0
         topic = load_topics().mqtt_topic("calibration/current")
-        # a subscriber that arrives afterwards only gets the message if it was published retained
-        got = None
+        # wait until the bridge has published it (a subscriber caught mid-publication sees it
+        # live, retain flag 0) ...
+        seen = None
         deadline = time.monotonic() + 60
-        while got is None and time.monotonic() < deadline:
-            got = h.late_subscriber(topic)
+        while seen is None and time.monotonic() < deadline:
+            seen = h.late_subscriber(topic)
+        # ... then a subscriber that arrives afterwards only gets it if it was retained
+        got = h.late_subscriber(topic) if seen is not None else None
     finally:
         h.stop(bridge)
     assert got is not None, "nothing retained on calibration/current"
