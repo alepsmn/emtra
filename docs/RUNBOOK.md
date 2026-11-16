@@ -133,8 +133,9 @@ No enseñar: el tramo 2 de la línea 19, que oscila por la dispersión natural d
 | `make demo-v1` se queda colgado o falla a medias | `make down` y repetir. El script parte siempre de estado limpio. |
 | No sale la alerta o el check final falla | Mirar `runs/demo-v1/ingestor.log` y `runs/demo-v1/reliability_monitor.log` |
 | Dashboard vacío | Recargar; comprobar que el rango de tiempo es el de la demo y no "últimos 5 minutos" |
-| Puerto ocupado (1883, 5432, 3000) | `docker ps` y parar el contenedor ajeno, o `make down` |
+| Puerto ocupado (1883, 5432, 3000, 9092) | `docker ps` y parar el contenedor ajeno, o `make down` |
 | Resultados raros entre ejecuciones | Procesos huérfanos: `scripts/demo_v1.sh stop` |
+| Nada llega a Kafka tras borrar el volumen a mano (`docker compose down -v`) | El outbox del puente conserva sus filas enviadas y por eso ignora los `msg_id` repetidos: borrar `data/bridge` y `data/lake` con el puente y el sink parados (`make demo-v1` ya lo hace) |
 | El mapa sale gris | No hay internet para las teselas; los datos están bien |
 
 ## 8. Hito 5 (pendiente)

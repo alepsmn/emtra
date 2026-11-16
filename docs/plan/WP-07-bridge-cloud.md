@@ -33,5 +33,5 @@ def test_dbt_staging_builds():              # dbt build --select staging en verd
 ```
 
 ## Checklist
-- [ ] El fog (Ingestor, Monitor, Grafana) sigue funcionando con `docker compose stop kafka`.
-- [ ] `make up` arranca también puente y sink; `make demo-v1` sigue en verde.
+- [x] El fog (Ingestor, Monitor, Grafana) sigue funcionando con `docker compose stop kafka`.
+- [x] `make up` arranca también puente y sink; `make demo-v1` sigue en verde.
