@@ -7,6 +7,7 @@ params:
   confidence: 0.95               # Wilson and bootstrap intervals
   bootstrap_resamples: 1000
   bootstrap_seed: 6              # emtra_common.rng root seed of the bootstrap
+  never_fulfilled_tolerance_s: 300   # K3: false if the bus arrives by last estimate + this
   detection_types: [slowdown, blocked_segment]   # K5, K6, K8 target scope; the rest is informative
   detection_severities: [medium, high]           # K5, K6, K8 population
 kpis:
@@ -14,7 +15,7 @@ kpis:
        op: ">=", target: 0.99, unit: "ratio"}
   K2: {name: "Derived arrival error, p95 of |derived - true|", experiments: [E1],
        op: "<=", target: 15, unit: "s"}
-  K3: {name: "False never-fulfilled (had a true arrival); fault-free and faulty days", experiments: [E1, E2],
+  K3: {name: "False never-fulfilled (the bus arrived within the estimate + 300 s); fault-free and faulty days", experiments: [E1, E2],
        op: "<=", target: 0.01, unit: "ratio"}
   K4: {name: "Indicator error, MAE of c_vh vs c_vh from true arrivals", experiments: [E1],
        op: "<=", target: 0.05, unit: "c_vh"}

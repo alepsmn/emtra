@@ -18,7 +18,7 @@ En cada instantánea de una parada:
 - Bus presente → actualizar estado.
 - Bus seguido que **no** aparece:
   - `last_time_left_s ≤ pass_threshold_s` (default 90) → **llegada** en el punto medio `(last_seen_at + polled_at) / 2`, `uncertainty_s = (polled_at − last_seen_at) / 2`.
-  - si no → candidato a **nunca cumplida**; se confirma si no reaparece en `grace_s` (default 120) **y** ha faltado en `never_fulfilled_grace_polls` sondeos consecutivos de esa parada (default 3; un sondeo fallido no cuenta). Si reaparece, se cancela y el seguimiento continúa.
+  - si no → candidato a **nunca cumplida**; se confirma si no reaparece en `grace_s` (default 120) **y** ha faltado en `never_fulfilled_grace_polls` sondeos consecutivos de esa parada (un sondeo fallido no cuenta; `make baseline` lo calibra con las semillas 2000–2019: el menor valor que elimina las reapariciones, tope 12, y pone `grace_s` = (N − 1) sondeos). Si reaparece, se cancela y el seguimiento continúa.
 - Sondeo fallido de la parada: no hay instantánea, no se decide nada; la incertidumbre de la siguiente llegada crece con el hueco real.
 - **Marca de agua:** tras procesar cada instantánea, si el mínimo sobre todas las paradas del corredor del último `polled_at` procesado ha avanzado, emitir `Watermark`. Una parada sin instantáneas durante `stale_stop_s` (default 300) deja de frenar la marca de agua.
 

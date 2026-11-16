@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from contracts.payloads import Arrival, NeverFulfilled, Watermark
+from services.ingestor.config import IngestorConfig
 from services.ingestor.core import ArrivalDeriver
 from services.ingestor.sources import FileSource
 
@@ -12,9 +13,9 @@ ESTIMATE_COLS = ["polled_at", "stop_id", "line_id", "direction_id", "bus_id", "t
                  "distance_m"]
 
 
-def run_batch(run_dir: Path) -> None:
+def run_batch(run_dir: Path, cfg: IngestorConfig | None = None) -> None:
     run_dir = Path(run_dir)
-    deriver = ArrivalDeriver()
+    deriver = ArrivalDeriver(cfg=cfg)
     est: list[tuple] = []
     out: dict[type, list[dict]] = {Arrival: [], NeverFulfilled: [], Watermark: []}
     for snap in FileSource(run_dir / "raw" / "snapshots.jsonl.gz").snapshots():

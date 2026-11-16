@@ -1,5 +1,5 @@
 # ReliabilityMonitor parameters (F3 + F9). See docs/plan/WP-04-monitor.md.
-allowed_lateness_s: 150      # a band closes when the watermark passes its end by this much (> ingestor grace_s)
+allowed_lateness_s: 150      # a band closes when the watermark passes its end by this much (the Monitor does not read never_fulfilled, so the ingestor grace does not constrain it)
 min_headways: 6              # c_vh needs at least this many pooled headways in the band
 min_arrivals: 3              # OTP needs at least this many arrivals in the band
 otp_match_window_s: {early: 300, late: 1800}   # a scheduled arrival matches delta in [-early, +late]

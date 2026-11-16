@@ -33,8 +33,10 @@ down:
 demo-v1:
 	scripts/demo_v1.sh
 
-# detector baseline, its residuals (+ hash) and the tuned L, h, z_max: always together (~1 min)
+# ingestor grace, detector baseline, its residuals (+ hash) and the tuned L, h, z_max: always
+# together (~1.5 min)
 baseline:
+	uv run python -m services.ingestor.tune_grace
 	uv run python -m services.reliability_monitor.baseline
 	uv run python -m services.reliability_monitor.tune_detectors
 

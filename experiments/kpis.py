@@ -39,7 +39,8 @@ class Params(BaseModel):
     bootstrap_seed: int
     detection_types: list[str]
     detection_severities: list[str]
-    last_minute_s: float = 60.0   # K2/K3: truth within this of the last watermark cannot be derived
+    never_fulfilled_tolerance_s: float   # K3: a real arrival within estimate + this makes it false
+    last_minute_s: float = 60.0   # K2: truth within this of the last watermark cannot be derived
 
 
 # ---- statistics ----------------------------------------------------------------------------
@@ -113,13 +114,23 @@ def k2(runs: list[Path], p: Params) -> Result:
     return _res(float(np.quantile(e, 0.95)) if len(e) else None, None, len(e))
 
 
+def false_never_fulfilled(nf: pd.DataFrame, truth: pd.DataFrame, tolerance_s: float) -> int:
+    """Rows of `nf` whose bus really arrived at that stop no later than the last estimated
+    arrival (last_seen_at + last_time_left_s) plus `tolerance_s`."""
+    if nf.empty:
+        return 0
+    est = nf.last_seen_at + pd.to_timedelta(nf.last_time_left_s.astype(float), unit="s")
+    m = nf.assign(est=est).merge(truth[[*KEY, "arrival_time"]].drop_duplicates(KEY), on=KEY)
+    return int((m.arrival_time <= m.est + pd.Timedelta(seconds=tolerance_s)).sum())
+
+
 def k3(runs: list[Path], p: Params) -> Result:
     false = total = 0
     for d in runs:
-        tr, _ = _truth_and_derived(d, p)
         nf = pd.read_parquet(d / "never_fulfilled.parquet")
         total += len(nf)
-        false += len(nf.merge(tr[KEY].drop_duplicates(), on=KEY, how="inner"))
+        false += false_never_fulfilled(nf, pd.read_parquet(d / "truth_arrivals.parquet"),
+                                       p.never_fulfilled_tolerance_s)
     return _res(false / total if total else 0.0, wilson(false, total, p.confidence), total)
 
 

@@ -10,6 +10,7 @@ from contracts.payloads import Arrival, NeverFulfilled, Watermark, make_envelope
 from contracts.raw import RawArrival, RawSnapshot
 from emtra_common.corridor import load_corridor
 from services.ingestor.batch import run_batch
+from services.ingestor.config import load_ingestor_config
 from services.ingestor.core import ArrivalDeriver
 from sim.run import run_sim
 
@@ -54,7 +55,9 @@ def test_midpoint_rule():
     # (b) disappears far away and never comes back: never fulfilled, after the grace period
     out = feed(ArrivalDeriver(), [snap("S04", s(0), ("19", "B1", 600)),
                                   snap("S04", s(30), ("19", "B1", 570)),
-                                  *[snap("S04", s(60 + 30 * i)) for i in range(8)]])
+                                  *[snap("S04", s(60 + 30 * i))
+                                    for i in range(load_ingestor_config()
+                                                   .never_fulfilled_grace_polls + 2)]])
     (nf,) = of(out, NeverFulfilled)
     assert (nf.bus_id, nf.last_seen_at, nf.last_time_left_s) == ("B1", s(30), 570)
     assert not of(out, Arrival)
@@ -210,11 +213,6 @@ def _grace_deriver(polls: int) -> ArrivalDeriver:
     from services.ingestor.config import IngestorConfig
     return ArrivalDeriver(cfg=IngestorConfig(pass_threshold_s=90, grace_s=0, stale_stop_s=300,
                                              never_fulfilled_grace_polls=polls))
-
-
-def test_grace_default_is_three_polls():
-    from services.ingestor.config import load_ingestor_config
-    assert load_ingestor_config().never_fulfilled_grace_polls == 3
 
 
 def test_grace_polls_reappearing_continues_tracking():

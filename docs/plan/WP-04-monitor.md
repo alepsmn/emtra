@@ -8,7 +8,7 @@ Calcular el indicador de fiabilidad por banda de 15 min, clasificarlo, detectar 
 ## Diseño (`services/reliability_monitor/`)
 
 ### `core/bands.py` — cierre de banda por tiempo de evento
-- Banda `[b, b + 15 min)`. Se cierra cuando llega un `Watermark ≥ b + 15 min + allowed_lateness_s` (default 150, mayor que `grace_s` del Ingestor).
+- Banda `[b, b + 15 min)`. Se cierra cuando llega un `Watermark ≥ b + 15 min + allowed_lateness_s` (default 150; el Monitor no lee las nunca cumplidas, así que no depende de `grace_s`).
 - Llegadas posteriores al cierre de su banda: se cuentan en `late_arrivals` y no recalculan nada.
 
 ### `core/indicators.py` — F3
