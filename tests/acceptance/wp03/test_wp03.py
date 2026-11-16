@@ -202,3 +202,47 @@ def test_breakdown_emits_never_fulfilled(tmp_path_factory):  # K3 with a real wi
     false = m[err.isna() | (err > 30)]
     # one is unavoidable: at the failure stop the last sighting (26 s) looks like a normal arrival
     assert set(zip(false.bus_id, false.stop_id, strict=True)) <= {(bus, fail_stop)}
+
+
+# ---- never_fulfilled_grace_polls: consecutive missing polls of the stop before confirming ----
+def _grace_deriver(polls: int) -> ArrivalDeriver:
+    """grace_s = 0 isolates the poll count."""
+    from services.ingestor.config import IngestorConfig
+    return ArrivalDeriver(cfg=IngestorConfig(pass_threshold_s=90, grace_s=0, stale_stop_s=300,
+                                             never_fulfilled_grace_polls=polls))
+
+
+def test_grace_default_is_three_polls():
+    from services.ingestor.config import load_ingestor_config
+    assert load_ingestor_config().never_fulfilled_grace_polls == 3
+
+
+def test_grace_polls_reappearing_continues_tracking():
+    d = _grace_deriver(3)
+    out = feed(d, [snap("S04", s(0), ("19", "B1", 600)),
+                   snap("S04", s(30)), snap("S04", s(60)),            # missing 2 polls < 3
+                   snap("S04", s(90), ("19", "B1", 480)),             # back: same track goes on
+                   snap("S04", s(120), ("19", "B1", 60)),
+                   snap("S04", s(150))])                              # close and gone: arrival
+    assert not of(out, NeverFulfilled)
+    (a,) = of(out, Arrival)
+    assert a.arrival_time == s(135) and a.last_seen_at == s(120)      # midpoint rule untouched
+
+
+def test_grace_polls_confirms_at_the_nth_missing_poll():
+    d = _grace_deriver(3)
+    out = feed(d, [snap("S04", s(0), ("19", "B1", 600)), snap("S04", s(30)), snap("S04", s(60))])
+    assert not of(out, NeverFulfilled)
+    out = d.process(snap("S04", s(90)))                               # third consecutive miss
+    (nf,) = of(out, NeverFulfilled)
+    assert (nf.bus_id, nf.last_seen_at, nf.last_time_left_s) == ("B1", s(0), 600)
+    assert not of(feed(d, [snap("S04", s(120))]), NeverFulfilled)     # emitted once
+
+
+def test_grace_polls_failed_poll_does_not_count():
+    d = _grace_deriver(3)
+    out = feed(d, [snap("S04", s(0), ("19", "B1", 600)), snap("S04", s(30)), snap("S04", s(60)),
+                   snap("S05", s(90)), snap("S05", s(120))])          # S04 poll failed at 90
+    assert not of(out, NeverFulfilled)
+    (nf,) = of(d.process(snap("S04", s(120))), NeverFulfilled)        # third miss of S04
+    assert nf.bus_id == "B1"
