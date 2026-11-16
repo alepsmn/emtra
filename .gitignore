@@ -20,3 +20,6 @@ data/
 target/
 dbt_packages/
 logs/
+
+# smoke report of `make experiments SMOKE=1`
+experiments/reports/*smoke*
