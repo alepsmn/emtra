@@ -326,25 +326,33 @@ def _seed(d: Path) -> int:
     return json.loads((d / "manifest.json").read_text())["root_seed"]
 
 
-def truth_effect(fault_run: Path, control: Path, f: FaultEvent, control_status: pd.DataFrame,
-                 window: timedelta = timedelta(hours=1)) -> dict:
-    """Mean difference (fault run - same seed without fault) of the true indicator of the affected
-    segment over the complete bands inside [t0, t0 + window): c_vh for HF terns, OTP for LF.
-    Terns: those of the fault's line if it has one, otherwise every line of the segment."""
+def effect_from_status(fault_status: pd.DataFrame, control_status: pd.DataFrame, f: FaultEvent,
+                       tolerance: int, window: timedelta = timedelta(hours=1)) -> dict:
+    """Worst change of the true indicator caused by a fault: fault run minus same seed without
+    fault, averaged per segment over the complete bands inside [t0, t0 + window), then the
+    maximum over the fault's segment and the segments within `tolerance` of it: the largest
+    c_vh increase (HF terns) and the largest OTP decrease (LF terns, a negative number).
+    Terns: those of the fault's line if it has one, otherwise every line."""
     key = ["line_id", "direction_id", "segment_id", "band_start"]
-    both = _truth_status(fault_run).merge(control_status, on=key, suffixes=("_f", "_c"))
-    both = both[(both.segment_id == f.segment_id) & both.value_f.notna() & both.value_c.notna()]
+    both = fault_status.merge(control_status, on=key, suffixes=("_f", "_c"))
+    both = both[both.value_f.notna() & both.value_c.notna()
+                & ((both.segment_id - f.segment_id).abs() <= tolerance)]
     if f.line_id is not None:
         both = both[(both.line_id == f.line_id) & (both.direction_id == f.direction_id)]
     t0 = pd.Timestamp(f.t0)
-    start = max(t0.ceil("15min"), t0)
     ends = both.band_start + pd.Timedelta(minutes=15)
-    both = both[(both.band_start >= start) & (ends <= t0 + window)]
-    out = {}
-    for ind, name in (("cvh", "d_cvh"), ("otp", "d_otp")):
+    both = both[(both.band_start >= t0.ceil("15min")) & (ends <= t0 + window)]
+    out: dict = {}
+    for ind, name, pick in (("cvh", "d_cvh", "idxmax"), ("otp", "d_otp", "idxmin")):
         sel = both[both.indicator_f == ind]
-        out[name] = float((sel.value_f - sel.value_c).mean()) if len(sel) else None
-        out[f"n_{ind}"] = len(sel)
+        per_seg = (sel.value_f - sel.value_c).groupby(sel.segment_id).agg(["mean", "size"])
+        if per_seg.empty:
+            out |= {name: None, f"n_{ind}": 0, f"{ind}_segment": None}
+        else:
+            seg = getattr(per_seg["mean"], pick)()
+            row = per_seg.loc[seg]
+            out |= {name: float(row["mean"]), f"n_{ind}": int(row["size"]),
+                    f"{ind}_segment": int(seg)}
     return out
 
 
@@ -364,7 +372,7 @@ def fault_breakdown(runs: list[Path], controls: list[Path], p: Params) -> pd.Dat
             c = ctl[_seed(d)]
             if c not in ctl_status:
                 ctl_status[c] = _truth_status(c)
-            eff = truth_effect(d, c, f, ctl_status[c])
+            eff = effect_from_status(_truth_status(d), ctl_status[c], f, p.segment_tolerance)
             hit = f.fault_id in m.pairs
             rows.append({"type": f.type, "severity": sev, "segment": f.segment_id,
                          "hour": f.t0.astimezone(tz).hour, "detected": int(hit),

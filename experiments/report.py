@@ -156,11 +156,12 @@ def write_report(rows: dict[str, Row], matrix: pd.DataFrame, delays: pd.DataFram
     lines += [f"| {r.type} | {r.segment} | {r.faults} | {r.tp} |" for r in by_segment.itertuples()]
     lines += ["", "### E2 by fault type, severity, segment and hour (no relocation)", "",
               "Detected = a matched alert of any level. Effect on the truth, independent of the "
-              "detector: mean difference between the fault run and the same seed without fault, "
-              "of the true c_vh (HF terns, Δc_vh > 0 is worse) and the true OTP (LF terns, "
-              "ΔOTP < 0 is worse) of the affected segment (the fault's line if it has one, else "
-              "every line of the segment), over the complete 15-min bands inside the hour "
-              "after t0. `pairs` = (tern, band) pairs averaged.", "",
+              "detector: fault run minus the same seed without fault, averaged per segment over "
+              "the complete 15-min bands inside the hour after t0, then the worst over the "
+              "fault's segment and its adjacent ones: the largest rise of the true c_vh (HF "
+              "terns) and the largest drop of the true OTP (LF terns, negative). Terns: the "
+              "fault's line if it has one, else every line. `pairs` = (tern, band) pairs of "
+              "that segment.", "",
               "| type | severity | segment | hour | detected/n | median delay (min) | Δc_vh "
               "(pairs) | ΔOTP (pairs) |", "|---|---|---|---|---|---|---|---|"]
     lines += [f"| {r.type} | {r.severity} | {r.segment} | {r.hour:02d} | {r.detected}/{r.n} "
