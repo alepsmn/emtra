@@ -174,24 +174,27 @@ def _alarm_within(det, z: np.ndarray) -> int | None:  # noqa: ANN001
     return None
 
 
-def test_ewma_detects_step():
+@pytest.mark.parametrize("indicator", ["cvh", "otp"])
+def test_ewma_detects_step(indicator):
     cfg = load_monitor_config()
     hits = 0
     for i in range(100):
         g = rng(3000, "wp04.step", i)
         z = np.concatenate([g.normal(0, 1, 200), g.normal(3, 1, 6)])
-        det = Ewma(cfg.ewma.lam, cfg.ewma.L)
+        det = Ewma(cfg.ewma.lam, getattr(cfg.ewma.L, indicator))
         _alarm_within(det, z[:200])                  # the pre-shift alarms do not count
         hits += _alarm_within(det, z[200:]) is not None
     assert hits >= 95
 
 
-def test_tuned_arl0():
+@pytest.mark.parametrize("indicator", ["cvh", "otp"])
+def test_tuned_arl0(indicator):
     cfg = load_monitor_config()
-    pool = load_residuals()          # z of the baseline days: what L and h were tuned on
+    pool = load_residuals()[indicator]   # z of the baseline days: what L and h were tuned on
     target = 0.85 * cfg.arl0_target
-    assert arl0(ewma_step(cfg.ewma.lam, cfg.ewma.L), pool, "test.ewma", runs=2000) >= target
-    assert arl0(cusum_step(cfg.cusum.k, cfg.cusum.h), pool, "test.cusum", runs=2000) >= target
+    L, h = getattr(cfg.ewma.L, indicator), getattr(cfg.cusum.h, indicator)  # noqa: N806
+    assert arl0(ewma_step(cfg.ewma.lam, L), pool, "test.ewma", runs=2000) >= target
+    assert arl0(cusum_step(cfg.cusum.k, h), pool, "test.cusum", runs=2000) >= target
 
 
 T0 = madrid(7, 0)

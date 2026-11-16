@@ -9,6 +9,6 @@ blocked_min_scheduled: 2     # blocked_segment: no arrival of the line in the se
 close_after_bands: 2         # consecutive inside bands that close an alert
 sigma_floor: 0.02            # lower bound of the baseline sigma0 when computing z
 arl0_target: 2000            # in-control average run length, in bands (tune_detectors.py)
-ewma: {lam: 0.2, L: 4.69}     # L is written by tune_detectors.py
-cusum: {k: 0.5, h: 8.87}      # h is written by tune_detectors.py
-shewhart: {z_max: 6.78}       # comparison only (K8); z_max is written by tune_detectors.py
+ewma: {lam: 0.2, L: {cvh: 3.95, otp: 5.28}}      # L per indicator is written by tune_detectors.py
+cusum: {k: 0.5, h: {cvh: 7.47, otp: 10.36}}      # h per indicator is written by tune_detectors.py
+shewhart: {z_max: {cvh: 5.08, otp: 7.25}}  # comparison only (K8); written by tune_detectors.py

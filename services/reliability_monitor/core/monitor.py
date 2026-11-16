@@ -39,10 +39,10 @@ class Monitor:
         self._buffer = BandBuffer(self.cfg.allowed_lateness_s)
         self._ind = Indicators(timetable, self.c, self.cfg)
         self._state: dict[Tern, TernState] = {
-            t: TernState(Ewma(self.cfg.ewma.lam, self.cfg.ewma.L),
-                         Cusum(self.cfg.cusum.k, self.cfg.cusum.h),
+            t: TernState(Ewma(self.cfg.ewma.lam, self.cfg.ewma.L.model_dump()),
+                         Cusum(self.cfg.cusum.k, self.cfg.cusum.h.model_dump()),
                          TernAlerts(*t, close_after_bands=self.cfg.close_after_bands),
-                         Shewhart(self.cfg.shewhart.z_max) if shewhart else None)
+                         Shewhart(self.cfg.shewhart.z_max.model_dump()) if shewhart else None)
             for t in self.c.terns()}
 
     @property
@@ -73,9 +73,10 @@ class Monitor:
                     z = ((indicator_x(tb.indicator, tb.value) - cell.mu0)
                          / max(cell.sigma0, self.cfg.sigma_floor))
                     if st.shewhart is not None:
-                        hits = (("ewma", st.shewhart.update(z)),)
+                        hits = (("ewma", st.shewhart.update(z, tb.indicator)),)
                     else:
-                        hits = (("ewma", st.ewma.update(z)), ("cusum", st.cusum.update(z)))
+                        hits = (("ewma", st.ewma.update(z, tb.indicator)),
+                                ("cusum", st.cusum.update(z, tb.indicator)))
                     triggers += [n for n, hit in hits if hit]
                 if tb.blocked:
                     triggers.append("blocked_segment")

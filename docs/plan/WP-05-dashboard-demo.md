@@ -17,7 +17,7 @@ Guion fijo, reproducible, ≈ 3 min de reloj:
 
 1. `make down` + volúmenes fuera; `make up` (infra, migraciones, carga de `stops` y `schedule`).
 2. Arranca Ingestor y Monitor con la línea base commiteada.
-3. Arranca el mundo: `--seed 51 --speed 60` (`data_split.yaml`), de 06:00 a 10:15 simuladas (06:00–07:00 es calentamiento y 10:00–10:15 la cola que cierra la última banda; el dashboard muestra desde las 07:00), con `config/demo/faults_v1.yaml`: un `slowdown` de severidad alta en el tramo 1 a las 08:00 (`{type: slowdown, severity: high, t0: "08:00", segment_id: 1}`).
+3. Arranca el mundo: `--seed 47 --speed 60` (`data_split.yaml`), de 06:00 a 10:15 simuladas (06:00–07:00 es calentamiento y 10:00–10:15 la cola que cierra la última banda; el dashboard muestra desde las 07:00), con `config/demo/faults_v1.yaml`: un `slowdown` de severidad alta en el tramo 1 a las 08:00 (`{type: slowdown, severity: high, t0: "08:00", segment_id: 1}`).
 4. Imprime la URL del dashboard.
 5. Al terminar el mundo, **comprueba** contra FogStore y sale con código ≠ 0 si falla algo:
    - hay `band_status` de las 12 bandas para la línea 19 en ambos tramos;

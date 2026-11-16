@@ -9,18 +9,25 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class PerIndicator(_Strict):
+    """A threshold for c_vh bands and another for OTP bands (calibrated separately)."""
+
+    cvh: float
+    otp: float
+
+
 class EwmaConfig(_Strict):
     lam: float
-    L: float
+    L: PerIndicator
 
 
 class CusumConfig(_Strict):
     k: float
-    h: float
+    h: PerIndicator
 
 
 class ShewhartConfig(_Strict):
-    z_max: float
+    z_max: PerIndicator
 
 
 class MatchWindow(_Strict):

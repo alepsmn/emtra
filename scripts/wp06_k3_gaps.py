@@ -41,3 +41,17 @@ df = pd.DataFrame(rows, columns=["group", "kind", "missing_polls", "true_arrival
 print(df.groupby(["group", "kind"]).agg(n=("kind", "size"), true=("true_arrival", "sum"),
                                          median_polls=("missing_polls", "median"),
                                          max_polls=("missing_polls", "max")).to_string())
+
+# K3 as defined in KPIS.md (false if the bus arrives by last estimate + tolerance), per group
+from experiments.kpis import false_never_fulfilled  # noqa: E402
+from experiments.report import load_kpi_config  # noqa: E402
+
+tol = load_kpi_config().params.never_fulfilled_tolerance_s
+rows = []
+for d in sorted(Path("runs").glob("e[12]_*")):
+    nf = pd.read_parquet(d / "never_fulfilled.parquet")
+    group = "clean" if "clean" in d.name else d.name.split("_")[1]
+    rows.append((group, len(nf), false_never_fulfilled(
+        nf, pd.read_parquet(d / "truth_arrivals.parquet"), tol)))
+k3 = pd.DataFrame(rows, columns=["group", "emitted", "false"]).groupby("group").sum()
+print(k3.assign(share=(k3["false"] / k3.emitted).round(2)).to_string())
