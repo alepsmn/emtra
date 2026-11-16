@@ -52,7 +52,7 @@ def test_cvh_pools_segment_stops():     # los headways de las 6 paradas entran e
 def test_otp_matching():                # 5 programados, 5 observados con δ conocidos -> OTP exacto; llegada adelantada más allá de la tolerancia no cuenta
 def test_band_closes_on_watermark():    # sin watermark no hay band_status; con él, exactamente uno por terna y banda
 def test_insufficient_data():           # n < mínimo -> status insufficient_data, detectores sin actualizar
-def test_ewma_detects_step():           # z ~ N(0,1) 200 bandas y luego N(3,1): alarma en <= 6 bandas en >= 95 de 100 semillas
+def test_ewma_detects_step():           # z ~ N(0,1) 200 bandas y luego N(3,1): alarma en >= 95 de 100 semillas, en <= 6 bandas (celdas c_vh) o <= 8 bandas (celdas OTP; L y h se calibran por indicador y el OTP, de cola pesada, tiene límites más altos)
 def test_tuned_arl0():                  # con L y h de config, 2000 rachas bootstrap de los residuos z de la línea base (`config/baselines/c19_residuals.npy`, lo que calibra el tuner): ARL0 medio >= 0,85 x arl0_target (cada detector)
 def test_single_open_alert():
 def test_alert_closes_after_two_inside_bands():

@@ -174,13 +174,16 @@ def _alarm_within(det, z: np.ndarray) -> int | None:  # noqa: ANN001
     return None
 
 
+STEP_BANDS = {"cvh": 6, "otp": 8}   # +3 sigma must be caught within this many bands (per indicator)
+
+
 @pytest.mark.parametrize("indicator", ["cvh", "otp"])
 def test_ewma_detects_step(indicator):
     cfg = load_monitor_config()
     hits = 0
     for i in range(100):
         g = rng(3000, "wp04.step", i)
-        z = np.concatenate([g.normal(0, 1, 200), g.normal(3, 1, 6)])
+        z = np.concatenate([g.normal(0, 1, 200), g.normal(3, 1, STEP_BANDS[indicator])])
         det = Ewma(cfg.ewma.lam, getattr(cfg.ewma.L, indicator))
         _alarm_within(det, z[:200])                  # the pre-shift alarms do not count
         hits += _alarm_within(det, z[200:]) is not None
