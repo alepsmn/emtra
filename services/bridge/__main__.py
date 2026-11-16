@@ -72,7 +72,8 @@ class Intake:
         if route is None:
             return
         try:
-            self.outbox.add(msg_id_of(m.payload), route[0], route[1], bytes(m.payload))
+            if not self.outbox.add(msg_id_of(m.payload), route[0], route[1], bytes(m.payload)):
+                log.info("duplicate ignored on %s (retain=%s)", m.topic, m.retain)
         except ValueError as e:
             self.rejected += 1
             log.warning("rejected on %s: %s", m.topic, e)

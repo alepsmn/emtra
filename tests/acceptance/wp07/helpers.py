@@ -253,7 +253,7 @@ def sink_caught_up(group: str, topics: list[str]) -> bool:
             tp = TopicPartition(t, 0)
             _, hi = c.get_watermark_offsets(tp, timeout=20)
             committed = c.committed([tp], timeout=20)[0].offset
-            if committed < hi:   # negative = nothing committed yet
+            if hi > 0 and committed < hi:   # an empty topic has nothing to commit
                 return False
         return True
     finally:

@@ -485,7 +485,7 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "SELECT service AS \"Servicio\", status AS \"Estado\", updated_at AS \"Última actualización\", round(extract(epoch FROM now() - updated_at)) AS \"Hace (s)\", (metrics->>'snapshots_per_min')::numeric AS \"Instantáneas/min\", (metrics->>'bands_closed')::int AS \"Bandas cerradas\" FROM service_health ORDER BY service"
+          "rawSql": "SELECT service AS \"Servicio\", status AS \"Estado\", updated_at AS \"Última actualización\", round(extract(epoch FROM now() - updated_at)) AS \"Hace (s)\", (metrics->>'snapshots_per_min')::numeric AS \"Instantáneas/min\", (metrics->>'bands_closed')::int AS \"Bandas cerradas\", (metrics->>'outbox_depth')::int AS \"Outbox (msgs)\" FROM service_health ORDER BY service"
         }
       ],
       "fieldConfig": {

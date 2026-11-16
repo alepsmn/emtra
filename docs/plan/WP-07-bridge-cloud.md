@@ -8,15 +8,17 @@ Añadir `kafka` (apache/kafka, KRaft, un nodo, heap 512 MB) al compose. `infra/k
 ## 7.2 Puente (`services/bridge/`)
 - Rutas generadas desde `contracts/topics.yaml`.
 - **fog→cloud:** cada mensaje MQTT entra primero en un **outbox SQLite** (`outbox(msg_id PK, topic, key, value, sent INTEGER)`). Un bucle vacía el outbox en orden de inserción hacia Kafka (`enable.idempotence=true`, `acks=all`) y marca `sent` al confirmarse la entrega. `INSERT OR IGNORE` por `msg_id` absorbe los duplicados de QoS 1.
-- Kafka caído → el outbox crece; `outbox_depth` va en el latido de `service_health` (panel de salud). Al volver, se vacía en orden.
+- Kafka caído → el outbox crece; `outbox_depth` va dentro de `metrics` de `service_health` (panel de salud; no es cambio de contrato). Al volver, se vacía en orden.
+- **Garantía: al menos una vez, sin pérdidas.** Sin transacciones de Kafka ni exactamente una vez. Tras matar el puente puede haber mensajes repetidos en Kafka; lo vinculante es que estén todos los `msg_id` y el orden por clave (la primera aparición de cada `msg_id`, por clave, sigue el orden de publicación). Los duplicados se eliminan aguas abajo por `msg_id`.
+- **Retenidos:** al reconectar, el broker reentrega los retenidos de `fog/status/...`. No vuelven a salir hacia Kafka: las filas enviadas **no se borran** del outbox y la clave primaria `msg_id` las absorbe.
 - **cloud→fog:** consumidor Kafka (commit manual tras publicar) que publica en MQTT con QoS 1 y retenido donde diga `topics.yaml`.
 - Núcleo puro: `core.py` con la lógica del outbox sobre una conexión SQLite; el adaptador pone MQTT y Kafka.
 
 ## 7.3 Sink (`services/cloud_sink/`)
-Consumidor de todos los topics fog→cloud. Escribe NDJSON comprimido en `data/lake/raw/<topic>/dt=YYYY-MM-DD/part-<n>.ndjson.gz` (fecha de `event_time`); commit de offset tras cerrar el fichero. Rotación por nº de mensajes o tiempo.
+Consumidor de todos los topics fog→cloud. Escribe NDJSON comprimido en `data/lake/raw/<topic>/dt=YYYY-MM-DD/part-<n>.ndjson.gz` (fecha de `event_time`); commit de offset tras cerrar el fichero. Rotación por nº de mensajes o tiempo (reloj de pared solo a través de `emtra_common/clock.py`). La partición `dt=` sale de `event_time` **en UTC**.
 
 ## 7.4 dbt (`cloud/dbt/`, adapter duckdb)
-- `staging/`: `stg_snapshots` (una fila por estimación, desanidada), `stg_arrivals`, `stg_status`, `stg_alerts`, leyendo los NDJSON con `read_json_auto`. Tests `not_null` y `unique(msg_id)`.
+- `staging/`: `stg_snapshots` (una fila por estimación, desanidada), `stg_arrivals`, `stg_status`, `stg_alerts`, leyendo los NDJSON con `read_json_auto`. Todos deduplican por `msg_id` antes de los tests. Tests `not_null` en `msg_id`; `unique(msg_id)` en `stg_arrivals`, `stg_status` y `stg_alerts`. En `stg_snapshots` una fila es una estimación, así que `msg_id` no puede ser único: el test de unicidad va sobre (`msg_id`, posición de la estimación dentro del mensaje).
 - `make dbt` = `dbt build`.
 
 ## Aceptación (`tests/acceptance/wp07/`)

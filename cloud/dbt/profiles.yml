@@ -1,0 +1,7 @@
+emtra:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('EMTRA_DUCKDB', 'data/warehouse.duckdb') }}"
+      threads: 1

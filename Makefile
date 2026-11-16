@@ -25,6 +25,8 @@ accept:
 up:
 	$(COMPOSE) up -d --wait --wait-timeout 90
 	uv run python -m emtra_common.reference load
+	uv run python -m infra.kafka.create_topics
+	scripts/demo_v1.sh cloud
 
 down:
 	scripts/demo_v1.sh stop
@@ -48,7 +50,8 @@ demo-final:
 	@echo "TODO WP12"
 
 dbt:
-	@echo "TODO WP7"
+	mkdir -p data
+	uv run dbt build --project-dir cloud/dbt --profiles-dir cloud/dbt
 
 calibrate:
 	@echo "TODO WP11"

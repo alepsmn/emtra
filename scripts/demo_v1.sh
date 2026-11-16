@@ -2,6 +2,7 @@
 # Demo v1 (WP5): from a clean state to the checked scenario; leaves the stack up.
 #   scripts/demo_v1.sh        full demo (about 5 min of wall clock)
 #   scripts/demo_v1.sh stop   only stop the EMTRA processes (make down uses it)
+#   scripts/demo_v1.sh cloud  start the bridge and the sink unless they run (make up uses it)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,7 +10,7 @@ cd "$ROOT"
 COMPOSE="docker compose -f infra/docker-compose.yml"
 PY="$ROOT/.venv/bin/python"
 OUT="$ROOT/runs/demo-v1"
-PROCS='-m (services\.ingestor|services\.reliability_monitor|sim\.world)( |$)'
+PROCS='-m (services\.ingestor|services\.reliability_monitor|services\.bridge|services\.cloud_sink|sim\.world)( |$)'
 
 # Stop EMTRA processes of earlier runs: SIGTERM, then SIGKILL after 30 s. Only those whose
 # working directory is this repo, whoever launched them.
@@ -29,8 +30,24 @@ stop_procs() {
     kill -KILL "${mine[@]}" 2>/dev/null || true
 }
 
+# Bridge and sink are part of the stack (make up), not of one demo run.
+start_cloud() {
+    local svc pid
+    mkdir -p "$ROOT/runs/cloud"
+    for svc in bridge cloud_sink; do
+        for pid in $(pgrep -f -- "-m services\.$svc( |\$)" || true); do
+            [ "$(readlink "/proc/$pid/cwd" 2>/dev/null)" = "$ROOT" ] && continue 2
+        done
+        nohup "$PY" -m "services.$svc" >>"$ROOT/runs/cloud/$svc.log" 2>&1 &
+    done
+}
+
 if [ "${1:-}" = "stop" ]; then
     stop_procs
+    exit 0
+fi
+if [ "${1:-}" = "cloud" ]; then
+    start_cloud
     exit 0
 fi
 
@@ -40,10 +57,15 @@ echo "== 1. clean state"
 stop_procs
 uv sync --frozen --quiet
 rm -rf "$OUT" && mkdir -p "$OUT"
+# Outbox and lake go with the Kafka volume: msg_ids are deterministic and the outbox keeps its
+# sent rows, so a stale outbox would swallow this run's messages.
+rm -rf "$ROOT/data/bridge" "$ROOT/data/lake"
 $COMPOSE down -v --remove-orphans
 make up
+stop_procs                           # make up started the bridge and the sink; reset must not race them
 "$PY" -m emtra_common.reset          # MQTT sessions, retained messages, FogStore tables
 "$PY" -m emtra_common.reference load # reference tables were emptied with the rest
+start_cloud
 
 echo "== 2. services"
 for svc in ingestor reliability_monitor; do

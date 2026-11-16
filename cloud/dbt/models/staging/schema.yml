@@ -1,0 +1,22 @@
+version: 2
+
+# Every staging model deduplicates by msg_id before these tests (the bridge is at-least-once).
+models:
+  - name: stg_snapshots
+    description: One row per estimate of a snapshot (unnested).
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [msg_id, estimate_pos]
+    columns:
+      - {name: msg_id, data_tests: [not_null]}
+      - {name: estimate_pos, data_tests: [not_null]}
+  - name: stg_arrivals
+    columns:
+      - {name: msg_id, data_tests: [not_null, unique]}
+  - name: stg_status
+    columns:
+      - {name: msg_id, data_tests: [not_null, unique]}
+  - name: stg_alerts
+    columns:
+      - {name: msg_id, data_tests: [not_null, unique]}

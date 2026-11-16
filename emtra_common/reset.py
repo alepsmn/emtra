@@ -14,7 +14,8 @@ from emtra_common.config import load_data_split
 from emtra_common.db import connect
 
 # Client ids of the services (persistent sessions). The world's id carries its seed.
-SERVICE_CLIENT_IDS = ("ingestor", "ingestor-pub", "reliability-monitor", "reliability-monitor-pub")
+SERVICE_CLIENT_IDS = ("ingestor", "ingestor-pub", "reliability-monitor", "reliability-monitor-pub",
+                      "bridge")
 WORLD_PREFIXES = ("sim-world-",)
 RETAINED_WAIT_S = 1.5   # retained messages arrive right after SUBSCRIBE
 

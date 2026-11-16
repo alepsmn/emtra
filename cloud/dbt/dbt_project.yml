@@ -1,0 +1,15 @@
+name: emtra
+version: "1.0.0"
+config-version: 2
+profile: emtra
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+vars:
+  lake_dir: data/lake/raw   # relative to where dbt runs (the repo root); see make dbt
+models:
+  emtra:
+    staging:
+      +materialized: table
+flags:
+  send_anonymous_usage_stats: false   # local prototype: nothing leaves the machine

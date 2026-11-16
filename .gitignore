@@ -23,3 +23,6 @@ logs/
 
 # smoke report of `make experiments SMOKE=1`
 experiments/reports/smoke/
+
+# dbt: per-user id file
+.user.yml
