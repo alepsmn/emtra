@@ -1,0 +1,4 @@
+# E1 (KPIS.md): 10 simulated days without faults -> K1-K4. Validation seeds (INTERFACES section 10).
+name: e1
+clean: {first_seed: 3000, days: 10}
+smoke: {clean_days: 2}

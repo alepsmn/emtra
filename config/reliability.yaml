@@ -11,4 +11,4 @@ sigma_floor: 0.02            # lower bound of the baseline sigma0 when computing
 arl0_target: 2000            # in-control average run length, in bands (tune_detectors.py)
 ewma: {lam: 0.2, L: 4.69}     # L is written by tune_detectors.py
 cusum: {k: 0.5, h: 8.87}      # h is written by tune_detectors.py
-shewhart: {z_max: 3.0}       # comparison only (K8)
+shewhart: {z_max: 6.78}       # comparison only (K8); z_max is written by tune_detectors.py

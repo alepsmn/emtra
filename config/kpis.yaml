@@ -1,0 +1,30 @@
+# KPI targets (docs/plan/KPIS.md). Proposed; the group freezes them on 30-nov, after that they
+# change only with a row in docs/DEVIATIONS.md. experiments/report.py reads PASS/FAIL from here.
+params:
+  match_window_s: 3600           # alert <-> fault matching: t0 <= t_open <= t0 + window
+  segment_tolerance: 1           # |segment_alert - segment_fault| <= this
+  service_days_per_week: 5       # every simulated day is a working day (corridor service_date)
+  confidence: 0.95               # Wilson and bootstrap intervals
+  bootstrap_resamples: 1000
+  bootstrap_seed: 6              # emtra_common.rng root seed of the bootstrap
+  detection_types: [slowdown, blocked_segment]   # K5, K6, K8 target scope; the rest is informative
+  detection_severities: [medium, high]           # K5, K6, K8 population
+kpis:
+  K1: {name: "Share of emitted estimates that reach the register", experiment: E1,
+       op: ">=", target: 0.99, unit: "ratio"}
+  K2: {name: "Derived arrival error, p95 of |derived - true|", experiment: E1,
+       op: "<=", target: 15, unit: "s"}
+  K3: {name: "False never-fulfilled (had a true arrival)", experiment: E1,
+       op: "<=", target: 0.01, unit: "ratio"}
+  K4: {name: "Indicator error, MAE of c_vh vs c_vh from true arrivals", experiment: E1,
+       op: "<=", target: 0.05, unit: "c_vh"}
+  K5: {name: "Detection recall (medium/high slowdown and blocked_segment)", experiment: E2,
+       op: ">=", target: 0.80, unit: "ratio"}
+  K6: {name: "Detection delay, median of t_open - t0", experiment: E2,
+       op: "<=", target: 30, unit: "min"}
+  K7: {name: "False alerts per line, direction and week", experiment: E2,
+       op: "<=", target: 1, unit: "alerts"}
+  K8: {name: "Recall EWMA+CUSUM minus Shewhart at the same ARL0", experiment: E2,
+       op: ">=", target: 0, unit: "recall difference"}
+  K17: {name: "action_required alerts per service hour", experiment: E2,
+        op: "<=", target: 2, unit: "alerts/h"}

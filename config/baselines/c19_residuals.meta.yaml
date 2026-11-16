@@ -1,0 +1,5 @@
+note: written by tune_detectors.py; the test fails if the baseline changes without
+  regenerating (make baseline)
+baseline_sha256: 6d878b8d3706a439812abe6c9e3a55525c2c7124e10a9a5e3a2956846ceda70e
+residuals_sha256: 868e24fc30ba852d985f73152f53b6d435680ae1e2f92a9c2dab7847d3c0b6f2
+n: 6860

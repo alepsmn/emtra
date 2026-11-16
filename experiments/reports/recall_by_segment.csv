@@ -1,0 +1,5 @@
+type,segment,faults,tp
+blocked_segment,1,4,4
+blocked_segment,2,4,0
+slowdown,1,4,2
+slowdown,2,4,1

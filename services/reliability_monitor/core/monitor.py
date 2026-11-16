@@ -11,7 +11,7 @@ from services.reliability_monitor.baseline import Baseline, indicator_x
 from services.reliability_monitor.config import MonitorConfig, load_monitor_config
 from services.reliability_monitor.core.alerts import TernAlerts
 from services.reliability_monitor.core.bands import BAND, BandBuffer
-from services.reliability_monitor.core.detectors import Cusum, Ewma
+from services.reliability_monitor.core.detectors import Cusum, Ewma, Shewhart
 from services.reliability_monitor.core.indicators import Indicators, Tern
 
 
@@ -20,14 +20,19 @@ class TernState:
     ewma: Ewma
     cusum: Cusum
     alerts: TernAlerts
+    shewhart: Shewhart | None = None
 
 
 class Monitor:
     """With `baseline=None` only the indicators are computed (no detectors, so no detector
-    alerts); `blocked_segment` alerts still work."""
+    alerts); `blocked_segment` alerts still work.
+
+    `shewhart=True` replaces EWMA + CUSUM by a Shewhart chart (K8 comparison only): its alarm is
+    reported as trigger "ewma" and the alert's `ewma_w`/`cusum_s` stay 0."""
 
     def __init__(self, timetable: pd.DataFrame, baseline: Baseline | None = None,
-                 cfg: MonitorConfig | None = None, corridor: Corridor | None = None) -> None:
+                 cfg: MonitorConfig | None = None, corridor: Corridor | None = None,
+                 shewhart: bool = False) -> None:
         self.cfg = cfg or load_monitor_config()
         self.c = corridor or load_corridor()
         self.baseline = baseline
@@ -36,7 +41,8 @@ class Monitor:
         self._state: dict[Tern, TernState] = {
             t: TernState(Ewma(self.cfg.ewma.lam, self.cfg.ewma.L),
                          Cusum(self.cfg.cusum.k, self.cfg.cusum.h),
-                         TernAlerts(*t, close_after_bands=self.cfg.close_after_bands))
+                         TernAlerts(*t, close_after_bands=self.cfg.close_after_bands),
+                         Shewhart(self.cfg.shewhart.z_max) if shewhart else None)
             for t in self.c.terns()}
 
     @property
@@ -66,9 +72,11 @@ class Monitor:
                 if tb.value is not None and cell is not None:
                     z = ((indicator_x(tb.indicator, tb.value) - cell.mu0)
                          / max(cell.sigma0, self.cfg.sigma_floor))
-                    ewma_alarm, cusum_alarm = st.ewma.update(z), st.cusum.update(z)
-                    triggers += [n for n, hit in (("ewma", ewma_alarm), ("cusum", cusum_alarm))
-                                 if hit]
+                    if st.shewhart is not None:
+                        hits = (("ewma", st.shewhart.update(z)),)
+                    else:
+                        hits = (("ewma", st.ewma.update(z)), ("cusum", st.cusum.update(z)))
+                    triggers += [n for n, hit in hits if hit]
                 if tb.blocked:
                     triggers.append("blocked_segment")
                 alert = st.alerts.step(band_start + BAND, tb.status, triggers,
@@ -78,4 +86,6 @@ class Monitor:
                     if alert.state == "closed":
                         st.ewma.reset()
                         st.cusum.reset()
+                        if st.shewhart is not None:
+                            st.shewhart.reset()
         return out

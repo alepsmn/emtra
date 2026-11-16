@@ -34,15 +34,19 @@ def replay(monitor: Monitor, arrivals: Iterable[Arrival],
     return out
 
 
-def run_batch(run_dir: Path, baseline: Path) -> None:
+def run_batch(run_dir: Path, baseline: Path, shewhart: bool = False) -> None:
+    """Writes band_status.parquet and alerts.parquet; with `shewhart=True` (K8) the Shewhart
+    comparison goes to *_shewhart.parquet instead."""
     run_dir = Path(run_dir)
-    monitor = Monitor(pd.read_parquet(run_dir / "timetable.parquet"), load_baseline(baseline))
+    sfx = "_shewhart" if shewhart else ""
+    monitor = Monitor(pd.read_parquet(run_dir / "timetable.parquet"), load_baseline(baseline),
+                      shewhart=shewhart)
     arrivals, marks = load_events(run_dir)
     out = replay(monitor, arrivals, marks)
     statuses = [o.model_dump() for o in out if isinstance(o, BandStatus)]
     alerts = [{**o.model_dump(), "alert_id": str(o.alert_id)} for o in out
               if isinstance(o, Alert)]
     pd.DataFrame(statuses, columns=list(BandStatus.model_fields)).to_parquet(
-        run_dir / "band_status.parquet", index=False)
+        run_dir / f"band_status{sfx}.parquet", index=False)
     pd.DataFrame(alerts, columns=list(Alert.model_fields)).to_parquet(
-        run_dir / "alerts.parquet", index=False)
+        run_dir / f"alerts{sfx}.parquet", index=False)

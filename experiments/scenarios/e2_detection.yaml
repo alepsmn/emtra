@@ -1,0 +1,16 @@
+# E2 (KPIS.md): 20 clean days (4 weeks) + 60 faults = 5 types x 3 severities x 4 seeds, all with
+# t0 in am_peak -> detection matrix, K5-K8, K17. Validation seeds (INTERFACES section 10).
+name: e2
+clean: {first_seed: 3010, days: 20}
+faults:
+  types: [breakdown, slowdown, dispatch_delay, demand_surge, blocked_segment]
+  severities: [low, medium, high]
+  # one placement per seed; each type reads the fields it needs: breakdown and dispatch_delay
+  # line_id (direction 0), slowdown and blocked_segment segment_id, demand_surge stop_id
+  placements:
+    - {seed: 3030, t0: "07:30", line_id: "19",  segment_id: 1, stop_id: S02}
+    - {seed: 3031, t0: "08:15", line_id: "C1",  segment_id: 2, stop_id: S09}
+    - {seed: 3032, t0: "08:45", line_id: "170", segment_id: 1, stop_id: S04}
+    - {seed: 3033, t0: "09:15", line_id: "19",  segment_id: 2, stop_id: S07}
+# smoke: 2 clean days + the types with a detection target, first placement, all severities (6)
+smoke: {clean_days: 2, fault_types: [slowdown, blocked_segment], placements: 1}

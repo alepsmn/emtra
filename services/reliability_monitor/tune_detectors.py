@@ -1,11 +1,18 @@
-"""Choose EWMA's L and CUSUM's h so each detector reaches ARL0 >= arl0_target.
+"""Choose EWMA's L, CUSUM's h and Shewhart's z_max so each detector reaches ARL0 >= arl0_target.
 
 `python -m services.reliability_monitor.tune_detectors`: z residuals of the baseline days
 (sim -> ingestor -> indicators, standardised with config/baselines/c19.yaml) are bootstrapped
 into in-control runs; the smallest L and h that reach the target are written to
-config/reliability.yaml. ARL0 is in bands; bisection with common random numbers.
+config/reliability.yaml. ARL0 is in bands; bisection with common random numbers. Shewhart's
+ARL0 is 1 / P(z > z_max) on the same residuals, so z_max is an order statistic of them (K8
+compares the three detectors at the same in-control rate).
+
+The residuals are saved with the SHA-256 of the baseline they were computed from
+(`c19_residuals.meta.yaml`); `load_residuals` refuses a stale file. `make baseline` regenerates
+the baseline, the residuals and the tuned parameters in one go.
 """
 
+import hashlib
 import re
 import tempfile
 from collections.abc import Callable
@@ -13,14 +20,21 @@ from math import sqrt
 from pathlib import Path
 
 import numpy as np
+import yaml
 
 from emtra_common.bands import band_group
 from emtra_common.config import CONFIG_DIR, load_data_split
 from emtra_common.rng import rng
-from services.reliability_monitor.baseline import collect_status, indicator_x, load_baseline
+from services.reliability_monitor.baseline import (
+    BASELINE_PATH,
+    collect_status,
+    indicator_x,
+    load_baseline,
+)
 from services.reliability_monitor.config import MonitorConfig, load_monitor_config
 
 RESIDUALS_FILE = CONFIG_DIR / "baselines" / "c19_residuals.npy"
+META_FILE = CONFIG_DIR / "baselines" / "c19_residuals.meta.yaml"
 RUNS = 4000      # in-control runs per ARL0 estimate (standard error about 1.6 %)
 CAP = 60_000     # a run longer than this is censored at CAP (negligible for a target of 2000)
 
@@ -42,8 +56,34 @@ def residuals(cfg: MonitorConfig) -> np.ndarray:
     return np.array(z)
 
 
+class StaleResidualsError(RuntimeError):
+    """The residuals file does not correspond to the current baseline."""
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def residuals_are_current(baseline: Path | None = None, residuals: Path | None = None,
+                          meta: Path | None = None) -> tuple[bool, str]:
+    """True if the residuals file was computed from this baseline and is unmodified."""
+    baseline, residuals, meta = baseline or BASELINE_PATH, residuals or RESIDUALS_FILE, \
+        meta or META_FILE
+    if not meta.exists():
+        return False, f"{meta.name} is missing"
+    rec = yaml.safe_load(meta.read_text())
+    if rec["baseline_sha256"] != sha256(baseline):
+        return False, f"{residuals.name} was computed from another baseline than {baseline.name}"
+    if rec["residuals_sha256"] != sha256(residuals):
+        return False, f"{residuals.name} does not match its recorded hash"
+    return True, "ok"
+
+
 def load_residuals() -> np.ndarray:
     """The residuals the committed L and h were tuned on (written by `main`)."""
+    ok, why = residuals_are_current()
+    if not ok:
+        raise StaleResidualsError(f"{why}; run `make baseline`")
     return np.load(RESIDUALS_FILE)
 
 
@@ -81,22 +121,36 @@ def smallest(make: Callable[[float], Step], lo: float, hi: float, pool: np.ndarr
     return hi, arl0(make(hi), pool, name)
 
 
+def shewhart_z_max(pool: np.ndarray, target: float) -> float:
+    """Smallest z_max with P(z > z_max) <= 1 / target on the residuals (so ARL0 >= target)."""
+    return float(np.sort(pool)[::-1][int(len(pool) // target)])
+
+
 def main() -> None:
     cfg = load_monitor_config()
     pool = residuals(cfg)
     np.save(RESIDUALS_FILE, pool)
+    META_FILE.write_text(yaml.safe_dump({
+        "note": "written by tune_detectors.py; the test fails if the baseline changes without "
+                "regenerating (make baseline)",
+        "baseline_sha256": sha256(BASELINE_PATH), "residuals_sha256": sha256(RESIDUALS_FILE),
+        "n": len(pool)}, sort_keys=False))
     print(f"{len(pool)} residuals: mean {pool.mean():.3f}, sd {pool.std():.3f}, "
           f"skew {((pool - pool.mean()) ** 3).mean() / pool.std() ** 3:.2f}")
     L, arl_e = smallest(lambda L: ewma_step(cfg.ewma.lam, L), 1.0, 8.0, pool, "ewma",
                         cfg.arl0_target)
     h, arl_c = smallest(lambda h: cusum_step(cfg.cusum.k, h), 1.0, 20.0, pool, "cusum",
                         cfg.arl0_target)
+    z_max = shewhart_z_max(pool, cfg.arl0_target)
+    arl_s = 1 / max((pool > z_max).mean(), 1e-12)
     print(f"EWMA lam={cfg.ewma.lam} L={L:.2f} ARL0={arl_e:.0f}; "
-          f"CUSUM k={cfg.cusum.k} h={h:.2f} ARL0={arl_c:.0f}; target {cfg.arl0_target:.0f}")
+          f"CUSUM k={cfg.cusum.k} h={h:.2f} ARL0={arl_c:.0f}; "
+          f"Shewhart z_max={z_max:.2f} ARL0={arl_s:.0f}; target {cfg.arl0_target:.0f}")
     path = CONFIG_DIR / "reliability.yaml"
     text = path.read_text()
     text = re.sub(r"(ewma:.*?L: )[\d.]+", rf"\g<1>{L:.2f}", text)
     text = re.sub(r"(cusum:.*?h: )[\d.]+", rf"\g<1>{h:.2f}", text)
+    text = re.sub(r"(shewhart: \{z_max: )[\d.]+", rf"\g<1>{z_max:.2f}", text)
     path.write_text(text)
 
 

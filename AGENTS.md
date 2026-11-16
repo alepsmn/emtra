@@ -79,7 +79,8 @@ runs/  data/          # salidas, fuera de git
 | `make accept WP=03` | aceptación de un WP |
 | `make up` / `make down` | infraestructura + servicios |
 | `make demo-v1` | demo de H4 de principio a fin (WP5) |
-| `make experiments` | experimentos de validación (WP6, WP12) |
+| `make baseline` | regenera de una vez la línea base de detectores, sus residuos (con hash) y L, h, z_max (WP4/WP6; ~1 min) |
+| `make experiments` | experimentos de validación (WP6, WP12); `SMOKE=1` versión reducida |
 | `make demo-final` | demo de H5 con el lazo cerrado (WP12) |
 | `make dbt` / `make calibrate` | modelos dbt (WP7) / calibración F12 (WP11) |
 | `make it-resilience` | experimento E5 con el stack completo (WP12) |

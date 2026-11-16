@@ -200,6 +200,8 @@ OTP: una llegada es puntual si −`otp_early_tolerance_s` ≤ δ ≤ 300 s, con 
 | `faults.parquet` | fault_id, type, severity, line_id, direction_id, segment_id, t0, t_end | sim |
 | `estimates.parquet`, `arrivals.parquet`, `never_fulfilled.parquet`, `watermarks.parquet` | payloads de §4 | Ingestor batch |
 | `band_status.parquet`, `alerts.parquet` | payloads de §4 | Monitor batch |
+| `band_status_shewhart.parquet`, `alerts_shewhart.parquet` | ídem, con un gráfico Shewhart en vez de EWMA+CUSUM (solo K8; su disparo se informa como trigger `ewma`) | Monitor batch (`shewhart=True`), WP6 |
+| `experiment.json` | hash de configuración y código, y especificación de la ejecución (caché del arnés) | `experiments/runner.py`, WP6 |
 
 ## 9. Modo batch
 

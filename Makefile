@@ -1,4 +1,4 @@
-.PHONY: setup lint test it accept up down demo-v1 experiments demo-final dbt calibrate it-resilience docs
+.PHONY: setup lint test it accept up down demo-v1 baseline experiments demo-final dbt calibrate it-resilience docs
 
 COMPOSE = docker compose -f infra/docker-compose.yml
 
@@ -33,8 +33,14 @@ down:
 demo-v1:
 	scripts/demo_v1.sh
 
+# detector baseline, its residuals (+ hash) and the tuned L, h, z_max: always together (~1 min)
+baseline:
+	uv run python -m services.reliability_monitor.baseline
+	uv run python -m services.reliability_monitor.tune_detectors
+
+# usage: make experiments [SMOKE=1]
 experiments:
-	@echo "TODO WP6"
+	uv run python -m experiments $(if $(SMOKE),--smoke)
 
 demo-final:
 	@echo "TODO WP12"
