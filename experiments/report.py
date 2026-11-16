@@ -79,8 +79,9 @@ def _git_sha() -> str:
     try:
         sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True,
                              capture_output=True, check=True).stdout.strip()
-        dirty = subprocess.run(["git", "status", "--porcelain", "--", ".", ":!experiments/reports"], cwd=ROOT, text=True,
-                               capture_output=True, check=True).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain", "--", ".", ":!experiments/reports"],
+            cwd=ROOT, text=True, capture_output=True, check=True).stdout.strip()
         return sha + (" (+ uncommitted changes)" if dirty else "")
     except (OSError, subprocess.CalledProcessError):
         return "unknown"

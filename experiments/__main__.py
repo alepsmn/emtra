@@ -11,8 +11,9 @@ from experiments.runner import RUNS_ROOT, SCENARIOS, expand, load_scenario, run_
 REPORTS = Path(__file__).parent / "reports"
 
 
-def run_experiments(smoke: bool = False, runs_root: Path = RUNS_ROOT, out_dir: Path = REPORTS,
+def run_experiments(smoke: bool = False, runs_root: Path = RUNS_ROOT, out_dir: Path | None = None,
                     jobs: int | None = None) -> Path:
+    out_dir = out_dir or REPORTS / ("smoke" if smoke else "")   # a smoke run never overwrites h4
     cfg = load_kpi_config(KPI_CONFIG)
     runs: dict[str, list[Path]] = {}
     seeds: list[str] = []
@@ -30,7 +31,7 @@ def run_experiments(smoke: bool = False, runs_root: Path = RUNS_ROOT, out_dir: P
     meta = {"smoke": smoke, "seeds": "; ".join(seeds), "git": _git_sha(),
             "runs": ", ".join(f"{k} {len(v)}" for k, v in runs.items())}
     return write_report(evaluate(results, cfg.kpis), matrix, delays, by_segment, meta, out_dir,
-                        "h4_smoke.md" if smoke else "h4.md",
+                        "h4.md",
                         timedelta(seconds=cfg.params.match_window_s).total_seconds() / 60)
 
 
