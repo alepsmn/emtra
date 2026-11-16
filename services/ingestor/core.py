@@ -23,6 +23,19 @@ class _Track:
     missing_polls: int = 0  # consecutive polls of this stop without the bus, while a candidate
 
 
+def is_absence(time_lefts: list[int], now: datetime, last_est: datetime, cap: int) -> bool:
+    """Does a poll in which the bus is not listed count as an absence for never_fulfilled?
+
+    `time_lefts`: the time_left_s of the entries of the bus's line at this stop and poll; the bus
+    had last been estimated to arrive at `last_est`. The list holds at most `cap` buses (the
+    nearest ones), so a full list whose entries are all estimated before `last_est` may simply be
+    hiding the bus: not an absence. A free slot, or an entry estimated after `last_est`, means
+    the bus would have been listed.
+    """
+    return len(time_lefts) < cap or any(now + timedelta(seconds=tl) > last_est
+                                        for tl in time_lefts)
+
+
 class ArrivalDeriver:
     def __init__(self, corridor: Corridor | None = None, cfg: IngestorConfig | None = None):
         self.c = corridor or load_corridor()
@@ -41,7 +54,9 @@ class ArrivalDeriver:
         out: list[Arrival | NeverFulfilled | Watermark] = []
 
         present: set[Key] = set()
+        listed: dict[str, list[int]] = {}      # line -> time_left_s of its entries in this poll
         for a in snap.arrivals:
+            listed.setdefault(a.line_id, []).append(a.time_left_s)
             key = (snap.stop_id, a.line_id, a.bus_id)
             present.add(key)
             # reappearing cancels a pending candidate
@@ -50,8 +65,13 @@ class ArrivalDeriver:
         for key, tr in list(self._tracks.items()):
             if key[0] != snap.stop_id or key in present:
                 continue
+            counts = is_absence(listed.get(key[1], []), t,
+                                tr.last_seen_at + timedelta(seconds=tr.last_time_left_s),
+                                self.cfg.api_max_buses_per_line)
             if tr.first_missing_at is not None:
-                tr.missing_polls += 1       # a failed poll has no snapshot, so it does not count
+                # a failed poll has no snapshot, so it does not count; neither does a poll in
+                # which the bus may be hidden by the API's per-line cap
+                tr.missing_polls += counts
                 continue
             if tr.last_time_left_s <= self.cfg.pass_threshold_s:
                 del self._tracks[key]
@@ -62,7 +82,7 @@ class ArrivalDeriver:
                     uncertainty_s=(t - tr.last_seen_at).total_seconds() / 2,
                     last_seen_at=tr.last_seen_at, first_missing_at=t))
             else:
-                tr.first_missing_at, tr.missing_polls = t, 1
+                tr.first_missing_at, tr.missing_polls = t, int(counts)
 
         grace = timedelta(seconds=self.cfg.grace_s)
         for key, tr in list(self._tracks.items()):

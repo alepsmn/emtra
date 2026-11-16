@@ -212,7 +212,8 @@ def _grace_deriver(polls: int) -> ArrivalDeriver:
     """grace_s = 0 isolates the poll count."""
     from services.ingestor.config import IngestorConfig
     return ArrivalDeriver(cfg=IngestorConfig(pass_threshold_s=90, grace_s=0, stale_stop_s=300,
-                                             never_fulfilled_grace_polls=polls))
+                                             never_fulfilled_grace_polls=polls,
+                                             api_max_buses_per_line=2))
 
 
 def test_grace_polls_reappearing_continues_tracking():
@@ -244,3 +245,40 @@ def test_grace_polls_failed_poll_does_not_count():
     assert not of(out, NeverFulfilled)
     (nf,) = of(d.process(snap("S04", s(120))), NeverFulfilled)        # third miss of S04
     assert nf.bus_id == "B1"
+
+
+# ---- a bus hidden by the API's per-line cap is not "absent" ---------------------------------
+def test_api_cap_equals_the_predictors():
+    from sim.params import load_sim_config
+    assert (load_ingestor_config().api_max_buses_per_line
+            == load_sim_config().predictor.max_buses_per_line)
+
+
+def test_full_list_of_earlier_buses_hides_the_absent_one():
+    d = _grace_deriver(3)
+    feed(d, [snap("S04", s(0), ("19", "B1", 600))])                      # last estimate: s(600)
+    # list full (cap 2) and both entries estimated before s(600): B1 may be hidden behind them
+    out = feed(d, [snap("S04", s(30 * i), ("19", "B2", 100), ("19", "B3", 200))
+                   for i in range(1, 8)])
+    assert not of(out, NeverFulfilled)
+    # the list now has room: the next 3 polls are real absences
+    out = feed(d, [snap("S04", s(240), ("19", "B2", 100)), snap("S04", s(270), ("19", "B2", 90)),
+                   snap("S04", s(300), ("19", "B2", 80))])
+    assert "B1" in [nf.bus_id for nf in of(out, NeverFulfilled)]   # (B3, also gone, too)
+
+
+def test_full_list_with_a_later_estimate_is_a_real_absence():
+    d = _grace_deriver(3)
+    feed(d, [snap("S04", s(0), ("19", "B1", 600))])
+    # B3 is estimated after B1's last estimate (s(630) > s(600)): B1 would have been listed
+    out = feed(d, [snap("S04", s(30 * i), ("19", "B2", 100), ("19", "B3", 600))
+                   for i in range(1, 4)])
+    assert [nf.bus_id for nf in of(out, NeverFulfilled)] == ["B1"]
+
+
+def test_other_lines_do_not_fill_the_list():
+    d = _grace_deriver(3)
+    feed(d, [snap("S04", s(0), ("19", "B1", 600))])
+    out = feed(d, [snap("S04", s(30 * i), ("C1", "C2", 100), ("C1", "C3", 200),
+                        ("19", "B2", 100)) for i in range(1, 4)])    # line 19 list: 1 entry
+    assert [nf.bus_id for nf in of(out, NeverFulfilled)] == ["B1"]

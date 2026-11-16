@@ -1,5 +1,6 @@
 # Ingestor (F1) parameters. See docs/plan/WP-03-ingestor.md.
 pass_threshold_s: 90     # a followed bus that vanishes with time_left <= this has arrived
-grace_s: 270             # a bus that vanishes farther away is "never fulfilled" if it stays gone
-never_fulfilled_grace_polls: 10   # ...and only after this many consecutive polls of the stop without it
+grace_s: 180             # a bus that vanishes farther away is "never fulfilled" if it stays gone
+never_fulfilled_grace_polls: 7   # ...and only after this many consecutive polls of the stop without it
+api_max_buses_per_line: 2   # = predictor.max_buses_per_line: a full list may hide a bus (test)
 stale_stop_s: 300        # a stop silent for longer stops holding back the watermark

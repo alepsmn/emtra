@@ -3,10 +3,11 @@
 `python -m services.ingestor.tune_grace`: runs the calibration seeds (config/data_split.yaml,
 2000-2019) with the shortest grace (1 poll, no time grace), so every bus that vanishes far from
 the stop becomes a candidate. For each candidate whose bus later reappears in the same stop's
-list, the gap is the number of consecutive polls of that stop it was missing. Confirming after N
-missing polls declares a bus that reappears after g >= N polls, so the smallest N that removes
-every reappearance is max(g) + 1, capped at CAP. `grace_s` = (N - 1) polls, which is when the
-Nth consecutive miss happens. Both are written to config/ingestor.yaml.
+list, the gap is the number of polls of that stop in between that count as absences (polls in
+which the API's per-line cap may hide the bus do not, see `core.is_absence`). Confirming after
+N absences declares a bus that reappears after g >= N, so the smallest N that removes every
+reappearance is max(g) + 1, capped at CAP. `grace_s` = (N - 1) polls, which is when the Nth
+consecutive absence happens. Both are written to config/ingestor.yaml.
 """
 
 import bisect
@@ -22,6 +23,7 @@ import pandas as pd
 from emtra_common.config import CONFIG_DIR, load_data_split
 from services.ingestor.batch import run_batch
 from services.ingestor.config import load_ingestor_config
+from services.ingestor.core import is_absence
 from sim.params import load_sim_config
 from sim.run import run_sim
 
@@ -33,18 +35,22 @@ def required_polls(gaps: list[int], cap: int = CAP) -> int:
     return min(max(gaps, default=0) + 1, cap)
 
 
-def reappearance_gaps(run_dir: Path, nf: pd.DataFrame) -> tuple[list[int], int]:
-    """(gap in polls of each never_fulfilled whose bus reappears at that stop, how many do not)."""
+def reappearance_gaps(run_dir: Path, nf: pd.DataFrame, cap: int) -> tuple[list[int], int]:
+    """(gap of each never_fulfilled whose bus reappears at that stop, how many do not). The gap
+    is the number of polls in between that count as absences (`is_absence`)."""
     keys = {(r.stop_id, r.line_id, r.bus_id) for r in nf.itertuples()}
     seen: dict[tuple, list[str]] = collections.defaultdict(list)
-    polls: dict[str, list[str]] = collections.defaultdict(list)
+    polls: dict[str, list[tuple[str, dict[str, list[tuple[str, int]]]]]] = \
+        collections.defaultdict(list)
     with gzip.open(run_dir / "raw" / "snapshots.jsonl.gz", "rt") as f:
         for line in f:
             r = json.loads(line)
-            polls[r["stop_id"]].append(r["polled_at"])
+            by_line: dict[str, list[tuple[str, int]]] = collections.defaultdict(list)
             for a in r["arrivals"]:
+                by_line[a["line_id"]].append((a["bus_id"], a["time_left_s"]))
                 if (k := (r["stop_id"], a["line_id"], a["bus_id"])) in keys:
                     seen[k].append(r["polled_at"])
+            polls[r["stop_id"]].append((r["polled_at"], by_line))
     gaps, never = [], 0
     for r in nf.itertuples():
         k = (r.stop_id, r.line_id, r.bus_id)
@@ -53,8 +59,14 @@ def reappearance_gaps(run_dir: Path, nf: pd.DataFrame) -> tuple[list[int], int]:
         if i == len(seen[k]):
             never += 1
             continue
-        p = polls[r.stop_id]
-        gaps.append(bisect.bisect_left(p, seen[k][i]) - bisect.bisect_right(p, last))
+        last_est = r.last_seen_at + pd.Timedelta(seconds=float(r.last_time_left_s))
+        n = 0
+        for t, by_line in polls[r.stop_id]:
+            if last < t < seen[k][i]:
+                tl = [x for _, x in by_line.get(r.line_id, [])]
+                n += is_absence(tl, pd.Timestamp(t).to_pydatetime(), last_est.to_pydatetime(),
+                                cap)
+        gaps.append(n)
     return gaps, never
 
 
@@ -69,7 +81,7 @@ def main() -> None:
             d = run_sim(seed, Path(tmp) / str(seed))
             run_batch(d, shortest)
             nf = pd.read_parquet(d / "never_fulfilled.parquet")
-            g, n = reappearance_gaps(d, nf)
+            g, n = reappearance_gaps(d, nf, cfg.api_max_buses_per_line)
             gaps += g
             never += n
             candidates += len(nf)

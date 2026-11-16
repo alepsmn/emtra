@@ -10,6 +10,7 @@ class IngestorConfig(BaseModel):
     pass_threshold_s: float
     grace_s: float
     never_fulfilled_grace_polls: int
+    api_max_buses_per_line: int   # the API lists at most this many buses per line and stop
     stale_stop_s: float
 
 
