@@ -17,6 +17,9 @@ dependencies = [
     "uvicorn",
     "httpx",
     "structlog",
+    "confluent-kafka>=2.16.1",
+    "duckdb>=2.0.0",
+    "dbt-duckdb>=1.11.1",
 ]
 
 [dependency-groups]

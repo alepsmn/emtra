@@ -1,0 +1,13 @@
+# Bridge and sink (WP7). Kafka's address is in infra.yaml. Paths are relative to the repo root.
+bridge:
+  outbox_path: data/bridge/outbox.sqlite
+  mqtt_client_id: bridge
+  consumer_group: bridge
+  batch_size: 500
+  max_in_flight: 5000
+  cycle_s: 0.1
+sink:
+  lake_dir: data/lake/raw
+  group_id: cloud-sink
+  rotate_max_msgs: 5000
+  rotate_max_s: 30
