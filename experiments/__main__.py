@@ -25,13 +25,15 @@ def run_experiments(smoke: bool = False, runs_root: Path = RUNS_ROOT, out_dir: P
         faulty = sorted({s.seed for s in specs if s.faults})
         seeds.append(f"{sc.name.upper()} clean {clean[0]}–{clean[-1]}"
                      + (f", faults {', '.join(map(str, faulty))}" if faulty else ""))
-    results = {k: kpis.KPI_FUNCS[k](runs[t.experiment], cfg.params) for k, t in cfg.kpis.items()}
+    results = {k: kpis.KPI_FUNCS[k]([d for e in t.experiments for d in runs[e]], cfg.params)
+               for k, t in cfg.kpis.items()}
     matrix, delays = kpis.detection_matrix(runs["E2"], cfg.params)
     by_segment = kpis.scope_by_segment(runs["E2"], cfg.params)
+    breakdown = kpis.fault_breakdown(runs["E2"], runs["E2CTL"], cfg.params)
     meta = {"smoke": smoke, "seeds": "; ".join(seeds), "git": _git_sha(),
             "runs": ", ".join(f"{k} {len(v)}" for k, v in runs.items())}
-    return write_report(evaluate(results, cfg.kpis), matrix, delays, by_segment, meta, out_dir,
-                        "h4.md",
+    return write_report(evaluate(results, cfg.kpis), matrix, delays, by_segment, breakdown, meta,
+                        out_dir, "h4.md",
                         timedelta(seconds=cfg.params.match_window_s).total_seconds() / 60)
 
 

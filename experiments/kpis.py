@@ -305,3 +305,66 @@ def scope_by_segment(runs: list[Path], p: Params) -> pd.DataFrame:
                 row[1] += f.fault_id in m.pairs
     return pd.DataFrame([(t, s, *v) for (t, s), v in sorted(rows.items())],
                         columns=["type", "segment", "faults", "tp"])
+
+
+# ---- E2 breakdown: detection and effect on the truth by type, severity, segment, hour ----
+SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2}
+
+
+def _seed(d: Path) -> int:
+    return json.loads((d / "manifest.json").read_text())["root_seed"]
+
+
+def truth_effect(fault_run: Path, control: Path, f: FaultEvent, control_status: pd.DataFrame,
+                 window: timedelta = timedelta(hours=1)) -> dict:
+    """Mean difference (fault run - same seed without fault) of the true indicator of the affected
+    segment over the complete bands inside [t0, t0 + window): c_vh for HF terns, OTP for LF.
+    Terns: those of the fault's line if it has one, otherwise every line of the segment."""
+    key = ["line_id", "direction_id", "segment_id", "band_start"]
+    both = _truth_status(fault_run).merge(control_status, on=key, suffixes=("_f", "_c"))
+    both = both[(both.segment_id == f.segment_id) & both.value_f.notna() & both.value_c.notna()]
+    if f.line_id is not None:
+        both = both[(both.line_id == f.line_id) & (both.direction_id == f.direction_id)]
+    t0 = pd.Timestamp(f.t0)
+    start = max(t0.ceil("15min"), t0)
+    ends = both.band_start + pd.Timedelta(minutes=15)
+    both = both[(both.band_start >= start) & (ends <= t0 + window)]
+    out = {}
+    for ind, name in (("cvh", "d_cvh"), ("otp", "d_otp")):
+        sel = both[both.indicator_f == ind]
+        out[name] = float((sel.value_f - sel.value_c).mean()) if len(sel) else None
+        out[f"n_{ind}"] = len(sel)
+    return out
+
+
+def fault_breakdown(runs: list[Path], controls: list[Path], p: Params) -> pd.DataFrame:
+    """One row per (type, severity, segment, hour of t0): faults, detected (any alert level),
+    median delay of the detected, and the effect on the truth, independent of the detector."""
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo(load_corridor().timezone)
+    ctl = {_seed(d): d for d in controls}
+    ctl_status: dict[Path, pd.DataFrame] = {}
+    rows = []
+    for d in runs:
+        faults, alerts, _, m = _match_run(d, p)
+        t_open = {a.alert_id: a.t_open for a in alerts}
+        for f, sev in faults:
+            c = ctl[_seed(d)]
+            if c not in ctl_status:
+                ctl_status[c] = _truth_status(c)
+            eff = truth_effect(d, c, f, ctl_status[c])
+            hit = f.fault_id in m.pairs
+            rows.append({"type": f.type, "severity": sev, "segment": f.segment_id,
+                         "hour": f.t0.astimezone(tz).hour, "detected": int(hit),
+                         "delay_min": (t_open[m.pairs[f.fault_id]] - f.t0).total_seconds() / 60
+                         if hit else None, **eff})
+    df = pd.DataFrame(rows)
+    g = df.groupby(["type", "severity", "segment", "hour"], sort=False)
+    out = g.agg(n=("detected", "size"), detected=("detected", "sum"),
+                median_delay_min=("delay_min", "median"), d_cvh=("d_cvh", "mean"),
+                n_cvh=("n_cvh", "sum"), d_otp=("d_otp", "mean"), n_otp=("n_otp", "sum")
+                ).reset_index()
+    out["_s"] = out.severity.map(SEVERITY_ORDER)
+    return out.sort_values(["type", "_s", "segment", "hour"]).drop(columns="_s").reset_index(
+        drop=True)

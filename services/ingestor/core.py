@@ -20,6 +20,7 @@ class _Track:
     last_seen_at: datetime
     last_time_left_s: int
     first_missing_at: datetime | None = None  # set while a "never fulfilled" candidate
+    missing_polls: int = 0  # consecutive polls of this stop without the bus, while a candidate
 
 
 class ArrivalDeriver:
@@ -47,7 +48,10 @@ class ArrivalDeriver:
             self._tracks[key] = _Track(a.direction_id, t, a.time_left_s)
 
         for key, tr in list(self._tracks.items()):
-            if key[0] != snap.stop_id or key in present or tr.first_missing_at is not None:
+            if key[0] != snap.stop_id or key in present:
+                continue
+            if tr.first_missing_at is not None:
+                tr.missing_polls += 1       # a failed poll has no snapshot, so it does not count
                 continue
             if tr.last_time_left_s <= self.cfg.pass_threshold_s:
                 del self._tracks[key]
@@ -58,11 +62,13 @@ class ArrivalDeriver:
                     uncertainty_s=(t - tr.last_seen_at).total_seconds() / 2,
                     last_seen_at=tr.last_seen_at, first_missing_at=t))
             else:
-                tr.first_missing_at = t
+                tr.first_missing_at, tr.missing_polls = t, 1
 
         grace = timedelta(seconds=self.cfg.grace_s)
         for key, tr in list(self._tracks.items()):
-            if tr.first_missing_at is not None and self._now - tr.first_missing_at >= grace:
+            if (tr.first_missing_at is not None
+                    and tr.missing_polls >= self.cfg.never_fulfilled_grace_polls
+                    and self._now - tr.first_missing_at >= grace):
                 del self._tracks[key]
                 out.append(NeverFulfilled(
                     line_id=key[1], direction_id=tr.direction_id, stop_id=key[0], bus_id=key[2],

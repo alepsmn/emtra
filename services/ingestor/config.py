@@ -9,6 +9,7 @@ class IngestorConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     pass_threshold_s: float
     grace_s: float
+    never_fulfilled_grace_polls: int
     stale_stop_s: float
 
 

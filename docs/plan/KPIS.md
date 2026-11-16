@@ -10,7 +10,7 @@ Todo se mide en simulación contra la verdad del simulador (`runs/<run_id>/truth
 |---|---|---|---|---|---|---|
 | K1 | F1 | Cuota de instantáneas emitidas que llegan al registro | filas en `estimates` / estimaciones emitidas | ≥ 99 % | E1, E5 | 6 |
 | K2 | F1 | Error de la llegada derivada | p95 de \|derivada − verdadera\| | ≤ 15 s | E1 | 6 |
-| K3 | F1 | Falsas "nunca cumplidas" | nunca cumplidas con llegada verdadera / total | ≤ 1 % | E1 | 6 |
+| K3 | F1 | Falsas "nunca cumplidas" | nunca cumplidas con llegada verdadera / total (días limpios y con fallos) | ≤ 1 % | E1, E2 | 6 |
 | K4 | F3 | Error del indicador | MAE de c_vh del sistema vs c_vh con llegadas verdaderas, por banda | ≤ 0,05 | E1 | 6 |
 | K5 | F9 | Recall de detección | fallos de severidad media/alta con alerta emparejada | ≥ 80 % | E2 | 6 |
 | K6 | F9 | Retardo de detección | mediana de `t_open − t0` | ≤ 30 min (2 bandas) | E2 | 6 |

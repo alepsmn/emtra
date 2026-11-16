@@ -155,4 +155,5 @@ def test_experiments_smoke(tmp_path):
     assert "PASS" in text or "FAIL" in text
     assert "git" in text.lower() and "seeds" in text.lower()
     assert (tmp_path / "rep" / "detection_delay.png").stat().st_size > 0
+    assert "ΔOTP" in text and (tmp_path / "rep" / "breakdown.csv").exists()
     assert (tmp_path / "rep" / "kpis.csv").exists() and (tmp_path / "rep" / "matrix.csv").exists()

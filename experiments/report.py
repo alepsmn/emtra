@@ -21,7 +21,7 @@ SEV_COLORS = {"low": "#9cc4f2", "medium": "#4f8fdd", "high": "#1f5fb0"}   # one 
 class Target(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
-    experiment: str
+    experiments: list[str]   # runs the KPI is measured on, pooled; shown under the first
     op: Literal[">=", "<="]
     target: float
     unit: str
@@ -60,13 +60,17 @@ def evaluate(results: dict[str, dict], targets: dict[str, Target]) -> dict[str, 
 
 
 def _fmt(v: float | None) -> str:
-    return "—" if v is None else f"{v:.3g}" if abs(v) < 100 else f"{v:.0f}"
+    return "—" if v is None or pd.isna(v) else f"{v:.3g}" if abs(v) < 100 else f"{v:.0f}"
+
+
+def _fmt_eff(v: float | None, n: int) -> str:
+    return "—" if v is None or pd.isna(v) else f"{v:+.3f} ({n})"
 
 
 def _kpi_table(rows: dict[str, Row], experiment: str) -> str:
     out = ["| KPI | Measure | Value | 95 % CI | n | Target | |", "|---|---|---|---|---|---|---|"]
     for r in rows.values():
-        if r.target.experiment != experiment:
+        if r.target.experiments[0] != experiment:
             continue
         ci = "—" if r.ci is None else f"[{_fmt(r.ci[0])}, {_fmt(r.ci[1])}]"
         name = r.target.name.replace("|", "\\|")      # a pipe would split the Markdown cell
@@ -119,8 +123,8 @@ def delay_figure(delays: pd.DataFrame, path: Path, window_min: float) -> None:
 
 
 def write_report(rows: dict[str, Row], matrix: pd.DataFrame, delays: pd.DataFrame,
-                 by_segment: pd.DataFrame, meta: dict, out_dir: Path, name: str,
-                 window_min: float) -> Path:
+                 by_segment: pd.DataFrame, breakdown: pd.DataFrame, meta: dict, out_dir: Path,
+                 name: str, window_min: float) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame([{"kpi": r.id, "value": r.value, "ci_lo": r.ci[0] if r.ci else None,
                    "ci_hi": r.ci[1] if r.ci else None, "n": r.n, "op": r.target.op,
@@ -128,6 +132,7 @@ def write_report(rows: dict[str, Row], matrix: pd.DataFrame, delays: pd.DataFram
                   for r in rows.values()]).to_csv(out_dir / "kpis.csv", index=False)
     matrix.to_csv(out_dir / "matrix.csv", index=False)
     by_segment.to_csv(out_dir / "recall_by_segment.csv", index=False)
+    breakdown.to_csv(out_dir / "breakdown.csv", index=False)
     delay_figure(delays, out_dir / "detection_delay.png", window_min)
     k8 = rows["K8"].detail if "K8" in rows else None
     lines = [f"# H4 validation — {'SMOKE (reduced)' if meta['smoke'] else 'full'}", "",
@@ -149,6 +154,18 @@ def write_report(rows: dict[str, Row], matrix: pd.DataFrame, delays: pd.DataFram
     lines += ["", "### Recall of the K5 population by segment (medium/high faults)", "",
               "| type | segment | faults | TP |", "|---|---|---|---|"]
     lines += [f"| {r.type} | {r.segment} | {r.faults} | {r.tp} |" for r in by_segment.itertuples()]
+    lines += ["", "### E2 by fault type, severity, segment and hour (no relocation)", "",
+              "Detected = a matched alert of any level. Effect on the truth, independent of the "
+              "detector: mean difference between the fault run and the same seed without fault, "
+              "of the true c_vh (HF terns, Δc_vh > 0 is worse) and the true OTP (LF terns, "
+              "ΔOTP < 0 is worse) of the affected segment (the fault's line if it has one, else "
+              "every line of the segment), over the complete 15-min bands inside the hour "
+              "after t0. `pairs` = (tern, band) pairs averaged.", "",
+              "| type | severity | segment | hour | detected/n | median delay (min) | Δc_vh "
+              "(pairs) | ΔOTP (pairs) |", "|---|---|---|---|---|---|---|---|"]
+    lines += [f"| {r.type} | {r.severity} | {r.segment} | {r.hour:02d} | {r.detected}/{r.n} "
+              f"| {_fmt(r.median_delay_min)} | {_fmt_eff(r.d_cvh, r.n_cvh)} "
+              f"| {_fmt_eff(r.d_otp, r.n_otp)} |" for r in breakdown.itertuples()]
     lines += ["", "![Detection delay](detection_delay.png)", "",
               "---", f"Seeds: {meta['seeds']}. Runs: {meta['runs']}. Git: {meta['git']}."]
     path = out_dir / name
