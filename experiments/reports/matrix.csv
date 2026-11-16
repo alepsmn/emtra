@@ -1,5 +1,5 @@
 type,severity,faults,tp,fn,fp
-blocked_segment,high,4,2,2,3
+blocked_segment,high,20,10,10,17
 blocked_segment,low,4,0,4,1
 blocked_segment,medium,4,2,2,2
 breakdown,high,4,0,4,1
@@ -12,6 +12,6 @@ demand_surge,medium,4,0,4,1
 dispatch_delay,high,4,2,2,3
 dispatch_delay,low,4,0,4,2
 dispatch_delay,medium,4,1,3,3
-slowdown,high,4,3,1,1
+slowdown,high,20,12,8,14
 slowdown,low,4,0,4,1
 slowdown,medium,4,0,4,1

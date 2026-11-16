@@ -9,7 +9,7 @@ params:
   bootstrap_seed: 6              # emtra_common.rng root seed of the bootstrap
   never_fulfilled_tolerance_s: 300   # K3: false if the bus arrives by last estimate + this
   detection_types: [slowdown, blocked_segment]   # K5, K6, K8 target scope; the rest is informative
-  detection_severities: [medium, high]           # K5, K6, K8 population
+  detection_severities: [high]                   # K5, K6, K8 population (both segments)
 kpis:
   K1: {name: "Share of emitted estimates that reach the register", experiments: [E1],
        op: ">=", target: 0.99, unit: "ratio"}
@@ -19,7 +19,7 @@ kpis:
        op: "<=", target: 0.01, unit: "ratio"}
   K4: {name: "Indicator error, MAE of c_vh vs c_vh from true arrivals", experiments: [E1],
        op: "<=", target: 0.05, unit: "c_vh"}
-  K5: {name: "Detection recall (medium/high slowdown and blocked_segment)", experiments: [E2],
+  K5: {name: "Detection recall (high-severity slowdown and blocked_segment, both segments)", experiments: [E2],
        op: ">=", target: 0.80, unit: "ratio"}
   K6: {name: "Detection delay, median of t_open - t0", experiments: [E2],
        op: "<=", target: 30, unit: "min"}

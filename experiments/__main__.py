@@ -28,11 +28,12 @@ def run_experiments(smoke: bool = False, runs_root: Path = RUNS_ROOT, out_dir: P
     results = {k: kpis.KPI_FUNCS[k]([d for e in t.experiments for d in runs[e]], cfg.params)
                for k, t in cfg.kpis.items()}
     matrix, delays = kpis.detection_matrix(runs["E2"], cfg.params)
-    by_segment = kpis.scope_by_segment(runs["E2"], cfg.params)
-    breakdown = kpis.fault_breakdown(runs["E2"], runs["E2CTL"], cfg.params)
+    fr = kpis.fault_runs(runs["E2"], runs["E2CTL"], cfg.params)
+    tables = {"by_cell": kpis.k5_by_cell(fr), "breakdown": kpis.fault_breakdown(fr),
+              "informative": kpis.informative_table(fr)}
     meta = {"smoke": smoke, "seeds": "; ".join(seeds), "git": _git_sha(),
             "runs": ", ".join(f"{k} {len(v)}" for k, v in runs.items())}
-    return write_report(evaluate(results, cfg.kpis), matrix, delays, by_segment, breakdown, meta,
+    return write_report(evaluate(results, cfg.kpis), matrix, delays, tables, meta,
                         out_dir, "h4.md",
                         timedelta(seconds=cfg.params.match_window_s).total_seconds() / 60)
 

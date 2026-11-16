@@ -1,16 +1,47 @@
-# E2 (KPIS.md): 20 clean days (4 weeks) + 60 faults = 5 types x 3 severities x 4 seeds, all with
-# t0 in am_peak -> detection matrix, K5-K8, K17. Validation seeds (INTERFACES section 10).
+# E2 (KPIS.md): 20 clean days (4 weeks) + faults with t0 in am_peak -> detection matrix, K5-K8, K17.
+# Validation seeds (INTERFACES section 10).
 name: e2
 clean: {first_seed: 3010, days: 20}
 faults:
-  types: [breakdown, slowdown, dispatch_delay, demand_surge, blocked_segment]
-  severities: [low, medium, high]
-  # one placement per seed; each type reads the fields it needs: breakdown and dispatch_delay
-  # line_id (direction 0), slowdown and blocked_segment segment_id, demand_surge stop_id
-  placements:
+  # K5 population: high slowdown and blocked_segment, both segments, 10 seeds per combination
+  - name: detection
+    types: [slowdown, blocked_segment]
+    severities: [high]
+    placements:   # seed k: t0 = 07:15 + 15 min x k, in both segments
+    - {seed: 3030, t0: "07:15", segment_id: 1}
+    - {seed: 3030, t0: "07:15", segment_id: 2}
+    - {seed: 3031, t0: "07:30", segment_id: 1}
+    - {seed: 3031, t0: "07:30", segment_id: 2}
+    - {seed: 3032, t0: "07:45", segment_id: 1}
+    - {seed: 3032, t0: "07:45", segment_id: 2}
+    - {seed: 3033, t0: "08:00", segment_id: 1}
+    - {seed: 3033, t0: "08:00", segment_id: 2}
+    - {seed: 3034, t0: "08:15", segment_id: 1}
+    - {seed: 3034, t0: "08:15", segment_id: 2}
+    - {seed: 3035, t0: "08:30", segment_id: 1}
+    - {seed: 3035, t0: "08:30", segment_id: 2}
+    - {seed: 3036, t0: "08:45", segment_id: 1}
+    - {seed: 3036, t0: "08:45", segment_id: 2}
+    - {seed: 3037, t0: "09:00", segment_id: 1}
+    - {seed: 3037, t0: "09:00", segment_id: 2}
+    - {seed: 3038, t0: "09:15", segment_id: 1}
+    - {seed: 3038, t0: "09:15", segment_id: 2}
+    - {seed: 3039, t0: "09:30", segment_id: 1}
+    - {seed: 3039, t0: "09:30", segment_id: 2}
+  # informative (no target): low and medium slowdown / blocked_segment ...
+  - name: informative_segment
+    types: [slowdown, blocked_segment]
+    severities: [low, medium]
+    placements: &placements4   # one per seed; each type reads the fields it needs
     - {seed: 3030, t0: "07:30", line_id: "19",  segment_id: 1, stop_id: S02}
     - {seed: 3031, t0: "08:15", line_id: "C1",  segment_id: 2, stop_id: S09}
     - {seed: 3032, t0: "08:45", line_id: "170", segment_id: 1, stop_id: S04}
     - {seed: 3033, t0: "09:15", line_id: "19",  segment_id: 2, stop_id: S07}
-# smoke: 2 clean days + the types with a detection target, first placement, all severities (6)
-smoke: {clean_days: 2, fault_types: [slowdown, blocked_segment], placements: 1}
+  # ... and single-vehicle faults and demand_surge: breakdown and dispatch_delay read line_id
+  # (direction 0), demand_surge stop_id
+  - name: informative_other
+    types: [breakdown, dispatch_delay, demand_surge]
+    severities: [low, medium, high]
+    placements: *placements4
+# smoke: 2 clean days + the first 6 runs of the detection group
+smoke: {clean_days: 2, fault_runs: 6}

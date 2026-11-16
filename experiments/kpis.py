@@ -304,20 +304,6 @@ def detection_matrix(runs: list[Path], p: Params) -> tuple[pd.DataFrame, pd.Data
     return matrix, pd.DataFrame(delays, columns=["type", "severity", "delay_min"])
 
 
-def scope_by_segment(runs: list[Path], p: Params) -> pd.DataFrame:
-    """Recall of the in-scope faults (K5 population) per fault type and segment."""
-    rows: dict[tuple[str, int], list[int]] = {}
-    for d in runs:
-        faults, _, _, m = _match_run(d, p)
-        for f, sev in faults:
-            if _in_scope(f.type, sev, p):
-                row = rows.setdefault((f.type, f.segment_id), [0, 0])
-                row[0] += 1
-                row[1] += f.fault_id in m.pairs
-    return pd.DataFrame([(t, s, *v) for (t, s), v in sorted(rows.items())],
-                        columns=["type", "segment", "faults", "tp"])
-
-
 # ---- E2 breakdown: detection and effect on the truth by type, severity, segment, hour ----
 SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2}
 
@@ -356,9 +342,10 @@ def effect_from_status(fault_status: pd.DataFrame, control_status: pd.DataFrame,
     return out
 
 
-def fault_breakdown(runs: list[Path], controls: list[Path], p: Params) -> pd.DataFrame:
-    """One row per (type, severity, segment, hour of t0): faults, detected (any alert level),
-    median delay of the detected, and the effect on the truth, independent of the detector."""
+def fault_runs(runs: list[Path], controls: list[Path], p: Params) -> pd.DataFrame:
+    """One row per fault: type, severity, segment, hour of t0, whether it is in the K5
+    population, detected (any alert level), delay, and the effect on the truth (independent of
+    the detector, see `effect_from_status`)."""
     from zoneinfo import ZoneInfo
 
     tz = ZoneInfo(load_corridor().timezone)
@@ -375,15 +362,47 @@ def fault_breakdown(runs: list[Path], controls: list[Path], p: Params) -> pd.Dat
             eff = effect_from_status(_truth_status(d), ctl_status[c], f, p.segment_tolerance)
             hit = f.fault_id in m.pairs
             rows.append({"type": f.type, "severity": sev, "segment": f.segment_id,
-                         "hour": f.t0.astimezone(tz).hour, "detected": int(hit),
+                         "hour": f.t0.astimezone(tz).hour, "k5": _in_scope(f.type, sev, p),
+                         "detected": int(hit),
                          "delay_min": (t_open[m.pairs[f.fault_id]] - f.t0).total_seconds() / 60
                          if hit else None, **eff})
-    df = pd.DataFrame(rows)
-    g = df.groupby(["type", "severity", "segment", "hour"], sort=False)
+    return pd.DataFrame(rows)
+
+
+def _sorted(df: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+    df = df.assign(_s=df.severity.map(SEVERITY_ORDER)) if "severity" in df else df
+    order = [("_s" if k == "severity" else k) for k in keys]
+    return df.sort_values(order).drop(columns="_s", errors="ignore").reset_index(drop=True)
+
+
+def fault_breakdown(fr: pd.DataFrame) -> pd.DataFrame:
+    """Per (type, severity, segment, hour of t0): faults, detected, median delay of the detected,
+    and the mean effect on the truth."""
+    g = fr.groupby(["type", "severity", "segment", "hour"], sort=False)
     out = g.agg(n=("detected", "size"), detected=("detected", "sum"),
                 median_delay_min=("delay_min", "median"), d_cvh=("d_cvh", "mean"),
                 n_cvh=("n_cvh", "sum"), d_otp=("d_otp", "mean"), n_otp=("n_otp", "sum")
                 ).reset_index()
-    out["_s"] = out.severity.map(SEVERITY_ORDER)
-    return out.sort_values(["type", "_s", "segment", "hour"]).drop(columns="_s").reset_index(
-        drop=True)
+    return _sorted(out, ["type", "severity", "segment", "hour"])
+
+
+def k5_by_cell(fr: pd.DataFrame) -> pd.DataFrame:
+    """K5 population per fault type and segment: detected/n, median delay, mean true effect."""
+    g = fr[fr.k5].groupby(["type", "segment"])
+    return g.agg(n=("detected", "size"), detected=("detected", "sum"),
+                 median_delay_min=("delay_min", "median"), d_cvh=("d_cvh", "mean"),
+                 d_otp=("d_otp", "mean")).reset_index()
+
+
+def informative_table(fr: pd.DataFrame) -> pd.DataFrame:
+    """Faults outside the K5 population: detection against the size of the true effect, per
+    type and severity (mean effect of the detected runs and of the missed ones)."""
+    rows = []
+    for (typ, sev), g in fr[~fr.k5].groupby(["type", "severity"]):
+        hit, miss = g[g.detected == 1], g[g.detected == 0]
+        rows.append({"type": typ, "severity": sev, "n": len(g), "detected": len(hit),
+                     "d_cvh": g.d_cvh.mean(), "d_cvh_detected": hit.d_cvh.mean(),
+                     "d_cvh_missed": miss.d_cvh.mean(), "d_otp": g.d_otp.mean()})
+    cols = ["type", "severity", "n", "detected", "d_cvh", "d_cvh_detected", "d_cvh_missed",
+            "d_otp"]
+    return _sorted(pd.DataFrame(rows, columns=cols), ["type", "severity"])

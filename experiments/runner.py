@@ -53,7 +53,10 @@ class Placement(_Strict):
     stop_id: str | None = None
 
 
-class FaultGrid(_Strict):
+class FaultGroup(_Strict):
+    """Every type x severity at every placement (placements are the outer loop)."""
+
+    name: str
     types: list[Literal["breakdown", "slowdown", "dispatch_delay", "demand_surge",
                         "blocked_segment"]]
     severities: list[Literal["low", "medium", "high"]]
@@ -62,14 +65,13 @@ class FaultGrid(_Strict):
 
 class Smoke(_Strict):
     clean_days: int
-    fault_types: list[str] | None = None
-    placements: int | None = None
+    fault_runs: int | None = None      # the first N fault runs, in expansion order
 
 
 class Scenario(_Strict):
     name: str
     clean: CleanSpec
-    faults: FaultGrid | None = None
+    faults: list[FaultGroup] = []
     smoke: Smoke
 
 
@@ -87,18 +89,17 @@ def expand(sc: Scenario, smoke: bool = False) -> list[RunSpec]:
     days = sc.smoke.clean_days if smoke else sc.clean.days
     specs = [RunSpec(run_id=f"{sc.name}_clean_{s}", seed=s, faults=[])
              for s in range(sc.clean.first_seed, sc.clean.first_seed + days)]
-    if sc.faults is None:
-        return specs
-    types = sc.smoke.fault_types if smoke and sc.smoke.fault_types else sc.faults.types
-    places = sc.faults.placements[:sc.smoke.placements if smoke and sc.smoke.placements else None]
-    for typ in types:
-        for sev in sc.faults.severities:
-            for pl in places:
-                fault = {"type": typ, "severity": sev, "t0": pl.t0,
-                         **{k: getattr(pl, k) for k in FAULT_FIELDS[typ]}}
-                specs.append(RunSpec(run_id=f"{sc.name}_{typ}_{sev}_{pl.seed}", seed=pl.seed,
-                                     faults=[fault]))
-    return specs
+    faulty = []
+    for group in sc.faults:
+        for pl in group.placements:
+            for typ in group.types:
+                for sev in group.severities:
+                    fault = {"type": typ, "severity": sev, "t0": pl.t0,
+                             **{k: getattr(pl, k) for k in FAULT_FIELDS[typ]}}
+                    seg = f"_s{pl.segment_id}" if "segment_id" in FAULT_FIELDS[typ] else ""
+                    faulty.append(RunSpec(run_id=f"{sc.name}_{typ}_{sev}_{pl.seed}{seg}",
+                                          seed=pl.seed, faults=[fault]))
+    return specs + (faulty[:sc.smoke.fault_runs] if smoke else faulty)
 
 
 @cache

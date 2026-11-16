@@ -1,5 +1,5 @@
-# Paired controls of E2: the same seeds as the fault runs (3030-3033), without faults. They only
+# Paired controls of E2: the same seeds as the fault runs (3030-3039), without faults. They only
 # serve to measure the effect of each fault on the truth (kpis.fault_breakdown); no KPI reads them.
 name: e2ctl
-clean: {first_seed: 3030, days: 4}
-smoke: {clean_days: 1}
+clean: {first_seed: 3030, days: 10}
+smoke: {clean_days: 2}

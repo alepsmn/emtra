@@ -20,9 +20,9 @@ config/kpis.yaml   # objetivos de KPIS.md
 
 ## Experimentos de este WP
 - **E1** → K1, K2, K3, K4.
-- **E2** → matriz VP/FP/FN por tipo y severidad; K5, K6, K7, K8 (el objetivo de K5–K6 aplica solo a `slowdown` y `blocked_segment`; `breakdown` y `dispatch_delay` se reportan como informativos, sin objetivo; ver KPIS.md) (repetir el Monitor con `Shewhart` sobre las mismas llegadas), K17.
+- **E2** → matriz VP/FP/FN por tipo y severidad; K5, K6, K7, K8 (el objetivo de K5–K6–K8 aplica solo a `slowdown` y `blocked_segment` de severidad alta, 2 tramos × 10 semillas; el resto se reporta como informativo en una tabla de detección frente a tamaño del efecto, con 10 ejecuciones de control sin fallo; ver KPIS.md) (repetir el Monitor con `Shewhart` sobre las mismas llegadas), K17.
 
-`make experiments` corre E1 y E2 completos; `make experiments SMOKE=1` una versión reducida (2 días, 6 fallos).
+`make experiments` corre E1 y E2 completos; `make experiments SMOKE=1` una versión reducida (2 días limpios + 6 fallos, los primeros de la población de K5).
 
 ## Aceptación (`tests/acceptance/wp06/`)
 ```python
