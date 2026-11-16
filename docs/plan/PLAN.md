@@ -23,7 +23,7 @@ Un agente, un WP por sesión, en este orden. Cada WP termina con algo ejecutable
 | WP3 | [WP-03-ingestor.md](WP-03-ingestor.md) | H4 | F1: llegadas derivadas | [x] |
 | WP4 | [WP-04-monitor.md](WP-04-monitor.md) | H4 | F3 + F9: indicador, detectores, alertas | [x] |
 | WP5 | [WP-05-dashboard-demo.md](WP-05-dashboard-demo.md) | H4 | F6 + `make demo-v1` | [x] |
-| WP6 | [WP-06-validation-v1.md](WP-06-validation-v1.md) | H4 (doc) | arnés de experimentos, E1 y E2 | [ ] |
+| WP6 | [WP-06-validation-v1.md](WP-06-validation-v1.md) | H4 (doc) | arnés de experimentos, E1 y E2 | [x] |
 | WP7 | [WP-07-bridge-cloud.md](WP-07-bridge-cloud.md) | H5 | Kafka, puente con outbox, sink local, dbt | [ ] |
 | WP8 | [WP-08-action-planner.md](WP-08-action-planner.md) | H5 | F10: ranking por simulación pareada; respaldo D5 | [ ] |
 | WP9 | [WP-09-decisions-recovery.md](WP-09-decisions-recovery.md) | H5 | F11: decisión, hold aplicado en el mundo, recuperación | [ ] |
