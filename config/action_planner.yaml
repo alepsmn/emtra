@@ -1,0 +1,12 @@
+# ActionPlanner (F10, WP8): paired evaluation of hold candidates against no action.
+replications: 30          # R; replication r uses the same root seed for every candidate (CRN)
+batch_size: 10            # replications are counted in complete batches; an answer needs one
+horizon_s: 3600           # simulated time evaluated from the state's as_of
+workers: 8                # processes of the pool, started and warmed before the first request
+root_seed: 8000           # emtra_common.rng root of the replication seeds
+budget_margin_s: 0.5      # of the request's budget, kept for the trip back to the fog (see REPORT WP8)
+consumer_group: action-planner
+# test_hold_damps_dispatch_bunching only: minutes from the fault's t0 to the instant at which the
+# CorridorState is built. Chosen among 15, 30 and 45 with calibration seeds 2000-2019
+# (scripts/wp08_calibration.py); see REPORT WP8.
+test_state_offset_min: 30

@@ -1,0 +1,5 @@
+# Holding rule (D5, WP8): hold_s = clip(alpha * (H - h_fwd), 0, hold_max_s) at a control point.
+# Used by the ActionPlanner's hold candidates and by the Monitor's fallback recommendation.
+alpha: 0.6            # share of the headway deficit recovered by holding (spec value, not tuned)
+hold_max_s: 120       # longest hold of one bus (spec value, not tuned)
+max_candidates: 2     # hold candidates per request: one per control point, in travel order

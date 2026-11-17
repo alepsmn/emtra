@@ -48,6 +48,14 @@ class Indicators:
         self._last: dict[tuple[str, str], datetime] = {}
         self._used: dict[tuple[str, str], set[int]] = {}
 
+    def fresh(self) -> "Indicators":
+        """A new instance on the same schedule, with no arrival seen (WP8: the evaluator
+        computes the indicator of many replications)."""
+        new = object.__new__(Indicators)
+        new.c, new.cfg, new._sched = self.c, self.cfg, self._sched
+        new._last, new._used = {}, {}
+        return new
+
     def close_band(self, band_start: datetime, arrivals: list[Arrival]) -> list[TernBand]:
         out = []
         for line_id, direction_id, segment_id in self.c.terns():

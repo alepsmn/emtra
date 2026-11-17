@@ -2,4 +2,5 @@
 baseline: {first: 1000, last: 1019}      # clean days for detector baseline
 calibration: {first: 2000, last: 2019}   # F12 interval calibration
 validation_first: 3000                   # validation / experiments: 3000 onwards
+wp08_validation: {first: 3100, last: 3109}   # validation block of test_hold_damps_dispatch_bunching (WP8)
 demo: 47                                 # chosen with scripts/wp05_seed_selection.py (WP5 report; 51 until the per-indicator calibration of WP6)

@@ -11,13 +11,13 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
 from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
 import simpy
 
+from contracts.payloads import CorridorState
 from emtra_common.bands import band_group
 from emtra_common.config import SimParams
 from emtra_common.corridor import Corridor
@@ -56,6 +56,8 @@ class BusRt:
     leg_start: float | None = None
     first_leg_mean: float = 0.0
     load: int = 0
+    # placed by an initial state: (position in trip.served of the next stop, seconds to it)
+    resume: tuple[int, float] | None = None
 
 
 class PaxStream:
@@ -64,7 +66,33 @@ class PaxStream:
         self.ptr = 0
 
 
+_DEPARTURES: dict[tuple[str, float, float], dict[str, list[tuple[datetime, str]]]] = {}
+
+
+def _departures(corridor: Corridor, cfg: SimConfig) -> dict[str, list[tuple[datetime, str]]]:
+    """Per line, (scheduled departure, trip_id) of every trip of the day, in time order. The
+    timetable is deterministic, so it is built once per process and configuration."""
+    key = (corridor.model_dump_json(), cfg.link_mean_s, cfg.dwell_mean_s)
+    if key not in _DEPARTURES:
+        tt = build_timetable(corridor, SimParams(link_mean_s=cfg.link_mean_s,
+                                                 dwell_mean_s=cfg.dwell_mean_s))
+        out = {}
+        for ln in corridor.lines:
+            first = tt[(tt.line_id == ln.line_id) & (tt.stop_id == ln.enter_stop)]
+            out[ln.line_id] = sorted((r.sched_arrival.to_pydatetime(), r.trip_id)
+                                     for r in first.itertuples())
+        _DEPARTURES[key] = out
+    return _DEPARTURES[key]
+
+
 class Engine:
+    """`initial_state` (WP8) starts the corridor from what the fog knows at `as_of` instead of
+    from an empty one: see sim/state.py. The clock then starts at `as_of` (time 0 is the start
+    of its band), no fault is expected and no snapshot is emitted.
+
+    A bus is the day's n-th trip of its line (`B<line>-<n>`), whatever the start of the run.
+    """
+
     def __init__(
         self,
         corridor: Corridor,
@@ -72,17 +100,15 @@ class Engine:
         seed: int,
         policy: ControlPolicy | None = None,
         faults: list[FaultSpec] | None = None,
-        initial_state: Any = None,
+        initial_state: CorridorState | None = None,
         start: datetime | None = None,
         horizon_s: float | None = None,
         env: simpy.Environment | None = None,
         on_snapshot: Callable[[str, str], None] | None = None,
     ) -> None:
-        if initial_state is not None:
-            raise NotImplementedError("loading an initial state is WP8")
         self.c, self.cfg, self.seed = corridor, cfg, seed
         self.policy: ControlPolicy = policy or NoAction()
-        self.env = env or simpy.Environment()
+        self.state = initial_state
         self.on_snapshot = on_snapshot
         self.stop_ids = corridor.stop_ids()
         self.n_stops = len(self.stop_ids)
@@ -93,22 +119,41 @@ class Engine:
         t_b = datetime(d.year, d.month, d.day, *hh(corridor.service_window[1]), tzinfo=tz) \
             if corridor.service_window[1] != "24:00" \
             else datetime(d.year, d.month, d.day, tzinfo=tz) + timedelta(days=1)
-        self.start = (start or t_a).astimezone(UTC)
-        if (self.start - t_a.astimezone(UTC)).total_seconds() % SLOT_S:
-            raise ValueError("start must be aligned to a 15-min band")
+        self.t0_s = 0.0            # sim time at which the run starts
+        if initial_state is not None:
+            if start is not None and start != initial_state.as_of:
+                raise ValueError("with an initial state the run starts at its as_of")
+            as_of = initial_state.as_of.astimezone(UTC)
+            self.t0_s = (as_of - t_a.astimezone(UTC)).total_seconds() % SLOT_S
+            self.start = as_of - timedelta(seconds=self.t0_s)
+        else:
+            self.start = (start or t_a).astimezone(UTC)
+            if (self.start - t_a.astimezone(UTC)).total_seconds() % SLOT_S:
+                raise ValueError("start must be aligned to a 15-min band")
+        self.env = env or simpy.Environment(initial_time=self.t0_s)
         self.service_end_s = (t_b.astimezone(UTC) - self.start).total_seconds()
-        self.horizon_s = min(horizon_s or self.service_end_s, self.service_end_s)
+        # absolute sim time of the end of the run
+        self.horizon_s = min(self.t0_s + horizon_s if horizon_s else self.service_end_s,
+                             self.service_end_s)
         n_slots = int(np.ceil(self.horizon_s / SLOT_S))
         self.slot_group = [band_group(self.start + timedelta(seconds=i * SLOT_S))
                            for i in range(n_slots)]
         self.scale = demand_scale(corridor, cfg)
         self.bays = [simpy.Resource(self.env, capacity=s.bays) for s in corridor.stops]
         self.faults = resolve_faults(faults or [], corridor, cfg, self.start, self.service_end_s)
-        self.last_arrival: dict[tuple[int, str], float] = {}
+        self.last_departure: dict[tuple[int, str], float] = {}
+        self.initial_departures: dict[tuple[int, str], float] = {}   # those set by the state
         self.truth: list[tuple] = []
         self.agg: dict[tuple[int, str, int], list[float]] = {}
         self.snapshot_lines: list[str] = []
+        self.onboard_delay_s = 0.0     # sum of hold x load on board (pax*s)
+        # (stop, line) -> (passengers already waiting at the start, seconds since the last bus)
+        self.queue0: dict[tuple[int, str], tuple[int, float]] = {}
         self._build_trips()
+        if initial_state is not None:
+            from sim.state import apply_state
+
+            apply_state(self, initial_state)
         self._build_pax()
 
     # -- construction --------------------------------------------------------------------
@@ -116,26 +161,26 @@ class Engine:
         return self.slot_group[min(int(t // SLOT_S), len(self.slot_group) - 1)]
 
     def _build_trips(self) -> None:
-        sp = SimParams(link_mean_s=self.cfg.link_mean_s, dwell_mean_s=self.cfg.dwell_mean_s)
-        tt = build_timetable(self.c, sp)
+        # From an initial state: its buses, plus the trips scheduled after as_of (the others
+        # have finished, or are missing: a gap is a gap).
+        placed = {b.bus_id for b in self.state.buses} if self.state is not None else set()
         raw = []
         for ln in self.c.lines:
-            first = tt[(tt.line_id == ln.line_id) & (tt.stop_id == ln.enter_stop)]
-            for r in first.itertuples():
-                s = (r.sched_arrival - self.start).total_seconds()
-                if 0 <= s < self.horizon_s:
-                    raw.append((s, ln.line_id, ln.direction_id, r.trip_id))
+            for ordinal, (sched, tid) in enumerate(_departures(self.c, self.cfg)[ln.line_id]):
+                s = (sched - self.start).total_seconds()
+                due = s >= 0 if self.state is None else s > self.t0_s
+                if (due and s < self.horizon_s) or f"B{ln.line_id}-{ordinal:03d}" in placed:
+                    raw.append((s, ln.line_id, ln.direction_id, tid, ordinal))
         raw.sort()
         ids = self.stop_ids
-        per_line: dict[str, int] = {}
+        served = {ln.line_id: [ids.index(x) for x in self.c.served_stops(ln.line_id)]
+                  for ln in self.c.lines}
         self.trips: list[Trip] = []
         dsp = self.cfg.dispatch
-        for n, (s, lid, did, tid) in enumerate(raw):
-            ordinal = per_line.get(lid, 0)
-            per_line[lid] = ordinal + 1
+        for n, (s, lid, did, tid, ordinal) in enumerate(raw):
             dev = max(dsp.min_s, rng(self.seed, "dispatch", tid).normal(dsp.mu_s, dsp.sigma_s))
-            served = [ids.index(x) for x in self.c.served_stops(lid)]
-            self.trips.append(Trip(n, tid, lid, did, ordinal, s, max(0.0, s + dev), served))
+            self.trips.append(Trip(n, tid, lid, did, ordinal, s, max(self.t0_s, s + dev),
+                                   served[lid]))
         for f in self.faults:
             if f.spec.type == "dispatch_delay":
                 tr = next((t for t in self.trips if t.line_id == f.line_id and t.sched_s >= f.t0_s),
@@ -177,14 +222,24 @@ class Engine:
                                 k = sg.poisson((f.factor - 1) * rate[i] * (hi - lo))
                                 parts.append(lo + sg.random(k) * (hi - lo))
                 t = np.sort(np.concatenate(parts)) if parts else np.empty(0)
-                self.pax[(g, ln.line_id)] = PaxStream(t[t < self.horizon_s])
+                t = t[t < self.horizon_s]
+                if self.state is not None:
+                    # who arrived before as_of is replaced by the expected queue (sim/state.py)
+                    n0 = self.queue0.get((g, ln.line_id), (0, 0.0))[0]
+                    t = np.concatenate([np.full(n0, self.t0_s), t[t >= self.t0_s]])
+                self.pax[(g, ln.line_id)] = PaxStream(t)
 
     # -- processes -----------------------------------------------------------------------
     def run(self) -> None:
         for b in self.buses:
             self.env.process(self._bus(b))
-        self.env.process(self._poller())
+        if self.state is None:
+            self.env.process(self._poller())
         self.env.run(until=self.horizon_s)
+
+    def en_route(self) -> list[str]:
+        """Buses that have reached their first stop and not yet their last one."""
+        return [b.bus_id for b in self.buses if b.started and not b.finished and b.next_i >= 1]
 
     def _link_time(self, tr: Trip, g: int) -> float:
         mean = self.cfg.link_mean_by_link_s[g]
@@ -214,15 +269,22 @@ class Engine:
     def _bus(self, b: BusRt):  # noqa: ANN202
         env, cfg, tr = self.env, self.cfg, b.trip
         ln = self.c.line(tr.line_id)
-        t_start = max(0.0, tr.dep_s - cfg.preroll_s)
-        yield env.timeout(t_start)
-        b.started = True
-        b.first_leg_mean = tr.dep_s - t_start
-        b.leg_start = env.now
-        yield env.timeout(max(0.0, tr.dep_s - env.now))
+        first = 0
+        if b.resume is not None:       # placed by the initial state, in the link to `first`
+            first, remaining = b.resume
+            b.leg_start = env.now
+            yield env.timeout(remaining)
+        else:
+            t_start = max(0.0, tr.dep_s - cfg.preroll_s)
+            yield env.timeout(max(0.0, t_start - env.now))
+            b.started = True
+            b.first_leg_mean = tr.dep_s - t_start
+            b.leg_start = env.now
+            yield env.timeout(max(0.0, tr.dep_s - env.now))
         last_pos = len(tr.served) - 1
-        for pos, g in enumerate(tr.served):
-            if pos > 0:
+        for pos in range(first, len(tr.served)):
+            g = tr.served[pos]
+            if pos > first:
                 b.leg_start = env.now
                 yield env.timeout(self._link_time(tr, tr.served[pos - 1]))
             b.next_i, b.leg_start = pos + 1, None
@@ -237,11 +299,6 @@ class Engine:
                 b.active = True
                 tr.breakdown = None
             t_arr = env.now
-            h_fwd = None
-            prev = self.last_arrival.get((g, tr.line_id))
-            if prev is not None:
-                h_fwd = t_arr - prev
-            self.last_arrival[(g, tr.line_id)] = t_arr
             with self.bays[g].request() as req:
                 yield req
                 now = env.now
@@ -255,14 +312,18 @@ class Engine:
                 yield env.timeout(dw.d0_s + dw.b_s_per_pax * boarded + dw.a_s_per_pax * a)
                 hold = 0.0
                 if pos != last_pos:
+                    prev = self.last_departure.get((g, tr.line_id))
                     view = BusView(b.bus_id, tr.line_id, tr.direction_id, tr.trip_id, b.load,
-                                   h_fwd)
+                                   None if prev is None else env.now - prev,
+                                   ln.headway_s[self._group_at(env.now)])
                     sv = StopView(self.stop_ids[g], g + 1, self.c.segment_of(self.stop_ids[g]),
                                   self.stop_ids[g] in self.c.control_points)
                     hold = max(0.0, float(self.policy.hold_seconds(view, sv, env.now)))
+                    self.onboard_delay_s += hold * b.load
                 depart_at = max(env.now + hold, self._blocked_until(tr, g, env.now))
                 if depart_at > env.now:
                     yield env.timeout(depart_at - env.now)
+                self.last_departure[(g, tr.line_id)] = env.now
                 self.truth.append((tr.line_id, tr.direction_id, tr.trip_id, b.bus_id,
                                    self.stop_ids[g], g + 1, t_arr, env.now, b.load, hold))
         b.finished = True
@@ -340,4 +401,30 @@ class Engine:
 
     def faults_frame(self) -> pd.DataFrame:
         return faults_frame(self.faults, self.start)
+
+    def excess_wait_pax_min(self) -> float:
+        """A (WP8): wait accumulated by every passenger of the corridor, all lines, from the
+        start of the run to its end, minus the same with scheduled headways (pax*min).
+
+        Real: the wait of who boarded plus, for who is still at the stop at the end, the wait
+        so far. Scheduled: a passenger arriving x seconds before the end with a bus every H
+        waits min(U, x), U uniform in (0, H): H/2 if x >= H, else x - x^2 / (2H). The scheduled
+        term does not depend on the control policy (the passengers are the same), so the
+        difference of A between two policies is the difference of their real waits.
+        """
+        end = self.horizon_s
+        real = sum(ws for _, ws in self.agg.values())
+        sched = 0.0
+        for (g, lid), ps in self.pax.items():
+            real += float(np.sum(end - ps.times[ps.ptr:]))
+            headway = self.c.line(lid).headway_s
+            n0, gap = self.queue0.get((g, lid), (0, 0.0))
+            if n0:   # already waiting at the start: the next scheduled bus is H - gap away
+                h0 = headway[self._group_at(self.t0_s)]
+                sched += n0 * min(max(h0 - gap, 0.0), end - self.t0_s)
+            t = ps.times[n0:]
+            h = np.array([headway[grp] for grp in self.slot_group])[(t // SLOT_S).astype(int)]
+            x = end - t
+            sched += float(np.sum(np.where(x >= h, h / 2, x - x * x / (2 * h))))
+        return (real - sched) / 60
 

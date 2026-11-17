@@ -49,6 +49,9 @@ class MonitorConfig(_Strict):
     ewma: EwmaConfig
     cusum: CusumConfig
     shewhart: ShewhartConfig
+    recommendation_budget_s: float     # wall clock; the fallback fires after it
+    rerequest_distance_delta: float
+    state_stale_s: float
 
 
 def load_monitor_config() -> MonitorConfig:

@@ -1,10 +1,12 @@
-"""Monitor core: arrivals and watermarks in; band statuses and alerts out."""
+"""Monitor core: arrivals, estimates and watermarks in; band statuses, alerts and
+recommendation requests out."""
 
 from dataclasses import dataclass
 
 import pandas as pd
 
-from contracts.payloads import Alert, Arrival, BandStatus, Watermark
+from contracts.payloads import Alert, Arrival, BandStatus, RecommendationRequest, Watermark
+from contracts.raw import RawSnapshot
 from emtra_common.bands import band_group
 from emtra_common.corridor import Corridor, load_corridor
 from services.reliability_monitor.baseline import Baseline, indicator_x
@@ -13,6 +15,8 @@ from services.reliability_monitor.core.alerts import TernAlerts
 from services.reliability_monitor.core.bands import BAND, BandBuffer
 from services.reliability_monitor.core.detectors import Cusum, Ewma, Shewhart
 from services.reliability_monitor.core.indicators import Indicators, Tern
+from services.reliability_monitor.core.recommend import Requester, RequestEvent
+from services.reliability_monitor.core.state import CorridorTracker
 
 
 @dataclass
@@ -28,14 +32,22 @@ class Monitor:
     alerts); `blocked_segment` alerts still work.
 
     `shewhart=True` replaces EWMA + CUSUM by a Shewhart chart (K8 comparison only): its alarm is
-    reported as trigger "ewma" and the alert's `ewma_w`/`cusum_s` stay 0."""
+    reported as trigger "ewma" and the alert's `ewma_w`/`cusum_s` stay 0. It asks for no
+    recommendation.
+
+    An `action_required` alert comes with a recommendation request carrying the corridor state
+    at the watermark that closed the band (WP8). `speed` is the world's (simulated seconds per
+    wall-clock second): the budget of the request is wall-clock time."""
 
     def __init__(self, timetable: pd.DataFrame, baseline: Baseline | None = None,
                  cfg: MonitorConfig | None = None, corridor: Corridor | None = None,
-                 shewhart: bool = False) -> None:
+                 shewhart: bool = False, speed: float = 1.0) -> None:
         self.cfg = cfg or load_monitor_config()
         self.c = corridor or load_corridor()
         self.baseline = baseline
+        self.budget_s = self.cfg.recommendation_budget_s / speed
+        self.tracker = CorridorTracker(self.c, self.cfg.state_stale_s)
+        self._requester = None if shewhart else Requester(self.cfg.rerequest_distance_delta)
         self._buffer = BandBuffer(self.cfg.allowed_lateness_s)
         self._ind = Indicators(timetable, self.c, self.cfg)
         self._state: dict[Tern, TernState] = {
@@ -54,9 +66,14 @@ class Monitor:
 
     def on_arrival(self, a: Arrival) -> None:
         self._buffer.add(a)
+        self.tracker.on_arrival(a)
 
-    def on_watermark(self, w: Watermark) -> list[BandStatus | Alert]:
-        out: list[BandStatus | Alert] = []
+    def on_snapshot(self, snap: RawSnapshot) -> None:
+        """Estimates only feed the corridor state; indicators and alerts do not read them."""
+        self.tracker.on_snapshot(snap)
+
+    def on_watermark(self, w: Watermark) -> list[BandStatus | Alert | RequestEvent]:
+        out: list[BandStatus | Alert | RequestEvent] = []
         for band_start, arrivals in self._buffer.close(w.watermark):
             group = band_group(band_start)
             for tb in self._ind.close_band(band_start, arrivals):
@@ -84,6 +101,11 @@ class Monitor:
                                        tb.distance_to_range, st.ewma.w, st.cusum.s)
                 if alert is not None:
                     out.append(alert)
+                    if self._requester is not None and self._requester.due(alert):
+                        out.append(RequestEvent(alert.updated_at, RecommendationRequest(
+                            alert_id=alert.alert_id, line_id=line_id, direction_id=direction_id,
+                            segment_id=segment_id, budget_s=self.budget_s,
+                            state=self.tracker.build(w.watermark))))
                     if alert.state == "closed":
                         st.ewma.reset()
                         st.cusum.reset()

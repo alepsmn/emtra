@@ -12,3 +12,7 @@ arl0_target: 2000            # in-control average run length, in bands (tune_det
 ewma: {lam: 0.2, L: {cvh: 3.95, otp: 5.28}}      # L per indicator is written by tune_detectors.py
 cusum: {k: 0.5, h: {cvh: 7.47, otp: 10.36}}      # h per indicator is written by tune_detectors.py
 shewhart: {z_max: {cvh: 5.08, otp: 7.25}}  # comparison only (K8); written by tune_detectors.py
+# Recommendation loop (WP8)
+recommendation_budget_s: 120     # wall-clock time the ActionPlanner has to answer (divided by the world's speed); then the fallback
+rerequest_distance_delta: 0.05   # ask again only if distance_to_range moved more than this since the last request
+state_stale_s: 180               # a bus with no estimate or arrival for this long is not in the CorridorState

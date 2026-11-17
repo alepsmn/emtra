@@ -97,6 +97,8 @@ class CorridorState:      # lo que el fog sabe; la perturbación va implícita e
     corridor_id: str
     buses: list[BusState] # bus_id, line_id, direction_id, last_stop_seq (0 = aún no ha entrado),
                           # last_stop_passed_at | None, eta_next_s | None
+                          # bus_id = "B<línea>-<n>": el n-ésimo viaje del día de la línea (así el
+                          # evaluador lo empareja con su viaje). as_of no tiene que estar alineado a banda.
 
 class Candidate:
     rank: int
@@ -106,7 +108,7 @@ class Candidate:
     ewt_acc_ci95: tuple[float, float] | None
     recovery_time_mean_s: float | None
     peak_deviation_mean: float | None
-    damping_mean: float | None
+    damping_mean: float | None         # None también si A de no acción <= 0 en alguna réplica (D no definido)
     damping_ci95: tuple[float, float] | None
     onboard_delay_pax_min: float | None
     pros: list[str]
@@ -172,7 +174,7 @@ Rol `grafana_ro` (migración `006_grafana_readonly.sql`): solo `SELECT` sobre to
 | `corridor.py` | modelo y carga de §1; `segment_of(stop_id)`, `lines_in_segment(segment_id)` |
 | `timetable.py` | §2; `scheduled_headway(line, stop, band_start)`, `line_type(line, band_group)` → `"HF"\|"LF"` (ambas con `corridor=None` opcional = c19). Llegada en la parada k-ésima servida = salida + k·(enlace + dwell) |
 | `config.py` | carga YAML → pydantic |
-| `holding.py` | regla de retención (WP4): `hold_s = clip(alpha * (H - h_fwd), 0, hold_max_s)` |
+| `holding.py` | regla de retención (WP8; parámetros en `config/holding.yaml`): `hold_seconds(H, h_fwd, alpha, hold_max_s)` = `clip(alpha * (H - h_fwd), 0, hold_max_s)`; `hold_control_points(corridor, line_id, segment_id, max_n)` → puntos de control donde un hold puede actuar sobre una alerta (los que sirve la línea, en el tramo alertado o después, sin su última parada, en orden de recorrido); `hold_params(...)` → `params` de un candidato `hold` |
 | `mqtt.py`, `db.py`, `health.py` | ayudas finas de conexión y latido |
 
 Niveles de servicio (Tabla 12 del H3), límites cerrados por arriba:
@@ -200,6 +202,7 @@ OTP: una llegada es puntual si −`otp_early_tolerance_s` ≤ δ ≤ 300 s, con 
 | `faults.parquet` | fault_id, type, severity, line_id, direction_id, segment_id, t0, t_end | sim |
 | `estimates.parquet`, `arrivals.parquet`, `never_fulfilled.parquet`, `watermarks.parquet` | payloads de §4 | Ingestor batch |
 | `band_status.parquet`, `alerts.parquet` | payloads de §4 | Monitor batch |
+| `rec_requests.parquet` | alert_id, line_id, direction_id, segment_id, budget_s, event_time, state (el `CorridorState` en JSON): una fila por petición de recomendación, en orden de emisión. Se lee con `services.reliability_monitor.batch.load_requests(run_dir)` | Monitor batch, WP8 |
 | `band_status_shewhart.parquet`, `alerts_shewhart.parquet` | ídem, con un gráfico Shewhart en vez de EWMA+CUSUM (solo K8; su disparo se informa como trigger `ewma`) | Monitor batch (`shewhart=True`), WP6 |
 | `experiment.json` | hash de configuración y código, y especificación de la ejecución (caché del arnés) | `experiments/runner.py`, WP6 |
 
@@ -209,7 +212,9 @@ OTP: una llegada es puntual si −`otp_early_tolerance_s` ≤ δ ≤ 300 s, con 
 # services/ingestor/batch.py
 def run_batch(run_dir: Path) -> None            # lee raw/, escribe estimates/arrivals/never_fulfilled/watermarks
 # services/reliability_monitor/batch.py
-def run_batch(run_dir: Path, baseline: Path) -> None   # lee arrivals + watermarks + timetable, escribe band_status/alerts
+def run_batch(run_dir: Path, baseline: Path) -> None   # lee arrivals + watermarks + timetable (+ estimates, para el CorridorState); escribe band_status/alerts/rec_requests
+def state_at(run_dir: Path, as_of) -> CorridorState    # el estado que el Monitor construiría en as_of
+def load_requests(run_dir: Path) -> list[RequestEvent] # (event_time, RecommendationRequest) de rec_requests.parquet
 ```
 
 Misma lógica (`core`) que el servicio en vivo. Un test de integración por servicio comprueba que vivo y batch dan el mismo resultado sobre la misma ejecución.
@@ -221,6 +226,7 @@ Misma lógica (`core`) que el servicio en vivo. Un test de integración por serv
 | Línea base de detectores (20 días limpios) | 1000–1019 |
 | Calibración del intervalo F12 | 2000–2019 |
 | Validación / experimentos | 3000 en adelante |
+| Validación de `test_hold_damps_dispatch_bunching` (WP8) | 3100–3109 (`wp08_validation`) |
 | Demo | 47 (elegida con `scripts/wp05_seed_selection.py`; ver REPORT de WP5 y de WP6: era 51 hasta calibrar L, h y z_max por indicador) |
 
 Ningún parámetro del sistema se ajusta con semillas de validación.

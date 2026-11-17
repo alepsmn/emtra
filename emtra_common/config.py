@@ -40,6 +40,7 @@ class DataSplit(BaseModel):
     baseline: SeedRange
     calibration: SeedRange
     validation_first: int
+    wp08_validation: SeedRange
     demo: int
 
 
