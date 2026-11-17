@@ -4,7 +4,7 @@
 seed: 42
 speed: 60
 start: "06:00"
-hours: 3.5
+hours: 2.75
 line_id: "19"
 faults:
   - {type: dispatch_delay, severity: high, t0: "08:00", line_id: "19"}

@@ -2,7 +2,7 @@
 mqtt_prefix: "emtra/v1/"
 mqtt:   # QoS 1, persistent sessions
   - {name: sim_raw,         pattern: "sim/raw/{stop_id}",                                schema_name: null,                           producer: World,    consumers: [Ingestor],                         retained: false, kafka: null}
-  - {name: snapshots,       pattern: "fog/snapshots/{stop_id}",                          schema_name: emtra.snapshot,               producer: Ingestor, consumers: [Bridge],                           retained: false, kafka: {topic: emtra.snapshots.v1, direction: fog_to_cloud}}
+  - {name: snapshots,       pattern: "fog/snapshots/{stop_id}",                          schema_name: emtra.snapshot,               producer: Ingestor, consumers: [Monitor, Bridge],                  retained: false, kafka: {topic: emtra.snapshots.v1, direction: fog_to_cloud}}
   - {name: arrivals,        pattern: "fog/arrivals/{line_id}/{direction_id}",            schema_name: emtra.arrival,                producer: Ingestor, consumers: [Monitor, Bridge],                  retained: false, kafka: {topic: emtra.arrivals.v1, direction: fog_to_cloud}}
   - {name: never_fulfilled, pattern: "fog/never_fulfilled/{line_id}/{direction_id}",    schema_name: emtra.never_fulfilled,        producer: Ingestor, consumers: [Bridge],                           retained: false, kafka: {topic: emtra.never_fulfilled.v1, direction: fog_to_cloud}}
   - {name: watermark,       pattern: "fog/watermark",                                    schema_name: emtra.watermark,              producer: Ingestor, consumers: [Monitor],                          retained: false, kafka: null}

@@ -12,28 +12,21 @@ Spec decisions applied here (REPORT WP8):
   config/data_split.yaml.
 """
 
-import signal
-import threading
 import time
 from datetime import timedelta
 from functools import partial
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
-import yaml
 
-from contracts.envelope import Envelope
-from contracts.payloads import Recommendation, RecommendationRequest, make_envelope
-from contracts.topics import load_topics
+from contracts.payloads import Recommendation, make_envelope
 from emtra_common.clock import ManualClock
 from emtra_common.config import load_data_split
 from emtra_common.corridor import load_corridor
 from tests.acceptance.wp08 import helpers as w
 
 CORR = load_corridor()
-HERE = Path(__file__).parent
 METRICS = ("ewt_acc_mean_pax_min", "ewt_acc_ci95", "recovery_time_mean_s", "peak_deviation_mean",
            "damping_mean", "damping_ci95", "onboard_delay_pax_min")
 
@@ -281,114 +274,26 @@ def test_fallback_when_cloud_silent(clean_state):
 
 @pytest.mark.integration
 def test_alert_to_recommendation_roundtrip(stack, tmp_path):
-    from emtra_common.db import connect
-    from emtra_common.reference import load as load_reference
-    from emtra_common.reset import truncate_tables
-    from tests.acceptance.wp07 import helpers as h
-
-    sc = yaml.safe_load((HERE / "roundtrip.yaml").read_text())
-    faults = tmp_path / "faults.yaml"
-    faults.write_text(yaml.safe_dump({"faults": sc["faults"]}))
-    truncate_tables()
-    load_reference()
-    # temporary outbox (the default one is never purged and msg_ids are deterministic)
-    cfg = h.cloud_config(tmp_path, bridge={"outbox_path": str(tmp_path / "outbox.sqlite"),
-                                           "mqtt_client_id": "bridge-wp08",
-                                           "consumer_group": f"bridge-wp08-{time.time_ns()}"})
-    topics = load_topics()
-    seen: list[tuple[float, str, bytes]] = []                  # (wall time, topic, payload)
-    sub = h.mqtt_client("wp08-observer")
-    sub.on_message = lambda _c, _u, m: seen.append((time.time(), m.topic, m.payload))
-    for pat in ("fog/alerts/{line_id}/{direction_id}", "fog/rec_requests/{alert_id}",
-                "fog/recommendations/{alert_id}"):
-        sub.subscribe(topics.mqtt_filter(pat), qos=1)
-
-    def recommendations() -> list[tuple]:
-        with connect() as c:
-            return c.execute("SELECT recommendation_id, alert_id, fallback, replications, "
-                             "runtime_s, candidates FROM recommendations").fetchall()
-
-    procs = [h.start("services.bridge", tmp_path / "bridge.log", "--config", str(cfg),
-                     ready="bridge ready"),
-             h.start("services.action_planner", tmp_path / "planner.log",
-                     ready="action_planner ready"),
-             h.start("services.ingestor", tmp_path / "ingestor.log"),
-             h.start("services.reliability_monitor", tmp_path / "monitor.log",
-                     "--speed", str(sc["speed"]))]
-    world = None
-    arrived: dict[str, float] = {}                             # recommendation_id -> wall time
-    stop_poll = threading.Event()
-
-    def poll_db() -> None:
-        while not stop_poll.is_set():
-            for r in recommendations():
-                arrived.setdefault(str(r[0]), time.time())
-            stop_poll.wait(0.02)
-
-    poller = threading.Thread(target=poll_db, daemon=True)
-    try:
-        time.sleep(4)                                          # MQTT subscriptions of the services
-        poller.start()
-        world = h.start("sim.world", tmp_path / "world.log", "--seed", str(sc["seed"]),
-                        "--speed", str(sc["speed"]), "--start", sc["start"], "--hours",
-                        str(sc["hours"]), "--faults", str(faults), "--out", str(tmp_path / "w"))
-        deadline = time.monotonic() + sc["hours"] * 3600 / sc["speed"] + 60
-        while not any(not r[2] for r in recommendations()):
-            if world.poll() is not None and time.monotonic() > deadline - 30:
-                break
-            assert time.monotonic() < deadline, "no simulated recommendation reached FogStore"
-            time.sleep(0.2)
-        time.sleep(3)                                          # late duplicates, if any
-    finally:
-        stop_poll.set()
-        if world is not None and world.poll() is None:
-            h.stop(world, signal.SIGINT)
-        for p in reversed(procs):
-            h.stop(p)
-        sub.loop_stop()
-        sub.disconnect()
-
-    rows = recommendations()
-    with connect() as c:
-        alerts = {r[0]: r[1] for r in c.execute("SELECT alert_id, line_id FROM alerts "
-                                                "WHERE level = 'action_required'")}
+    run = w.live_loop(tmp_path, planner=True)
+    sc, rows, alerts = run["scenario"], run["rows"], run["alert_ids"]
     assert alerts, "the scenario opened no action_required alert"
-    sim_rows = [r for r in rows if not r[2]]
+    sim_rows = [r for r in rows if not r["fallback"]]
     assert sim_rows, f"only fallback recommendations: {rows}"
-    rec_id, alert_id, _fallback, replications, runtime_s, candidates = sim_rows[0]
-    assert alert_id in alerts                                  # of an alert in FogStore
-    assert replications >= 10
-    assert {c["action"] for c in candidates} == {"hold", "no_action"}
-    assert all(c["ewt_acc_mean_pax_min"] is not None for c in candidates)
+    row = sim_rows[0]
+    assert row["alert_id"] in alerts                           # of an alert in FogStore
+    assert row["replications"] >= 10
+    assert {c["action"] for c in row["candidates"]} == {"hold", "no_action"}
+    assert all(c["ewt_acc_mean_pax_min"] is not None for c in row["candidates"])
 
     # the envelopes of the cycle share correlation_id = alert_id
-    def envelopes(pattern: str, model):  # noqa: ANN001, ANN202
-        prefix = topics.mqtt_prefix + pattern.split("{")[0]
-        return [(t, Envelope[model].model_validate_json(p)) for t, topic, p in seen
-                if topic.startswith(prefix)]
-
-    reqs = [(t, e) for t, e in envelopes("fog/rec_requests/{alert_id}", RecommendationRequest)
-            if e.payload.alert_id == alert_id]
-    recs = [(t, e) for t, e in envelopes("fog/recommendations/{alert_id}", Recommendation)
-            if e.payload.recommendation_id == rec_id]
+    reqs = [(t, e) for t, e in run["requests"] if e.payload.alert_id == row["alert_id"]]
+    recs = [(t, e) for t, e in run["recommendations"]
+            if e.payload.recommendation_id == row["recommendation_id"]]
     assert reqs and recs
-    assert reqs[0][1].correlation_id == alert_id == recs[0][1].correlation_id
+    assert reqs[0][1].correlation_id == row["alert_id"] == recs[0][1].correlation_id
     assert recs[0][1].event_time == reqs[0][1].event_time      # "el de la petición"
     assert recs[0][1].producer == "action_planner"
+    assert reqs[0][1].payload.budget_s == pytest.approx(120 / sc["speed"])
     # at-least-once: a repeated recommendation is stored once
-    assert len({r[0] for r in rows}) == len(rows)
-
-    budget = reqs[0][1].payload.budget_s
-    assert budget == pytest.approx(120 / sc["speed"])
-    all_reqs = envelopes("fog/rec_requests/{alert_id}", RecommendationRequest)
-    sent_at = {}                                               # alert_id -> first request seen
-    for t, e in all_reqs:
-        sent_at.setdefault(e.payload.alert_id, t)
-    w.record("roundtrip", {
-        "seed": sc["seed"], "speed": sc["speed"], "budget_s": budget,
-        "action_required_alerts": len(alerts),
-        "requests": len({e.msg_id for _, e in all_reqs}),
-        "recommendations": [
-            {"fallback": r[2], "replications": r[3], "runtime_s": r[4],
-             "first_request_to_fogstore_s": arrived.get(str(r[0]), float("nan"))
-             - sent_at.get(r[1], float("nan"))} for r in rows]})
+    assert len({r["recommendation_id"] for r in rows}) == len(rows)
+    w.record("roundtrip", w.loop_measures(run))

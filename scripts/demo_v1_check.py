@@ -1,6 +1,6 @@
 """Helpers of scripts/demo_v1.sh: world arguments, readiness, end-of-demo checks, fingerprint.
 
-python -m scripts.demo_v1_check args|ready|check
+python -m scripts.demo_v1_check args|url|speed|ready|check
 """
 
 import hashlib
@@ -143,6 +143,8 @@ def main() -> None:
               f"--hours {cfg.hours} --faults {cfg.faults}")
     elif cmd == "url":
         print(cfg.dashboard_url)
+    elif cmd == "speed":
+        print(cfg.speed)
     elif cmd == "ready":
         wait_ready(cfg)
     elif cmd == "check":
@@ -157,7 +159,7 @@ def main() -> None:
         print("  fingerprint:", json.dumps(fp["counts"]), fp["band_status"][:12], fp["alerts"][:12])
         sys.exit(0 if all(ok for _, ok, _ in results) else 1)
     else:
-        sys.exit("usage: python -m scripts.demo_v1_check args|url|ready|check")
+        sys.exit("usage: python -m scripts.demo_v1_check args|url|speed|ready|check")
 
 
 if __name__ == "__main__":

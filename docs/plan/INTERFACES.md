@@ -124,7 +124,7 @@ Solo diseño (modelo pydantic sí, sin productor ni topic activo): `emtra.passen
 | Topic | Contenido | Productor | Consumidores | Retenido | → Kafka |
 |---|---|---|---|---|---|
 | `sim/raw/{stop_id}` | RawSnapshot (sin sobre) | World | Ingestor | no | — |
-| `fog/snapshots/{stop_id}` | snapshot | Ingestor | Bridge | no | `emtra.snapshots.v1` |
+| `fog/snapshots/{stop_id}` | snapshot | Ingestor | Monitor (estimaciones para el `CorridorState`, WP8), Bridge | no | `emtra.snapshots.v1` |
 | `fog/arrivals/{line_id}/{direction_id}` | arrival | Ingestor | Monitor, Bridge | no | `emtra.arrivals.v1` |
 | `fog/never_fulfilled/{line_id}/{direction_id}` | never_fulfilled | Ingestor | Bridge | no | `emtra.never_fulfilled.v1` |
 | `fog/watermark` | watermark | Ingestor | Monitor | no | — |
