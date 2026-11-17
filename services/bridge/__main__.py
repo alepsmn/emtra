@@ -156,14 +156,18 @@ def cloud_to_fog(router: Router, client: mqtt.Client, cfg: BridgeConfig, bootstr
                 log.warning("skipped %s@%s: %s", m.topic(), m.offset(), e)
                 consumer.commit(message=m, asynchronous=False)
                 continue
-            while not stop.is_set():
+            acked = False
+            while not stop.is_set() and not acked:
                 try:
-                    client.publish(topic, m.value(), qos=1, retain=retained).wait_for_publish(10)
-                    break
+                    info = client.publish(topic, m.value(), qos=1, retain=retained)
+                    # wait_for_publish returns silently on timeout: ask is_published() instead
+                    while not stop.is_set() and not acked:
+                        info.wait_for_publish(1)
+                        acked = info.is_published()
                 except (RuntimeError, ValueError):
                     stop.wait(1)                 # MQTT down: try again (a repeat is harmless)
-            else:
-                break
+            if not acked:
+                break                            # stopping: leave this offset uncommitted
             consumer.commit(message=m, asynchronous=False)   # only after the broker acknowledged
     finally:
         consumer.close()

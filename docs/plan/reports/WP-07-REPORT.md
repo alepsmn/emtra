@@ -24,6 +24,7 @@ Mías, a revisar:
 - **El outbox no se purga**, así que crece sin límite (≈ 7 000 filas por demo de 4 h simulada). Con `msg_id` deterministas, un Kafka nuevo con un outbox viejo no recibiría nada: por eso el demo borra `data/bridge` y `data/lake` y el RUNBOOK lo avisa. Si se purga algún día, hará falta otra defensa contra la reentrega de retenidos.
 - **Mosquitto** conserva por defecto como máximo 1 000 mensajes QoS 1 en cola para un cliente desconectado. Con el puente caído más de ~20 s a 50 msg/s se perderían mensajes **antes** de llegar al puente. No lo he cambiado (afecta también a Ingestor y Monitor); el test de reinicio mata el puente ~2 s.
 - **Reintento ante fallo de entrega:** si Kafka declara fallida una entrega (tras `delivery.timeout.ms`, 5 min por defecto), el puente espera a que se asienten las demás y reenvía lo no confirmado desde el principio. Con productor idempotente el orden se conserva; es camino de código que **no he ejercitado** (los cortes medidos duran 30 s).
+- **Corrección posterior (cloud→fog):** `wait_for_publish(10)` vuelve sin excepción al vencer el plazo, así que la primera versión confirmaba el offset de Kafka sin PUBACK. Ahora `cloud_to_fog` guarda el `MQTTMessageInfo`, sigue esperando hasta que `is_published()` sea cierto (respetando `stop`) y solo entonces confirma; si `stop` llega antes, el offset queda sin confirmar. Sin test nuevo: `test_cloud_to_fog_retained` cubre el camino normal; el de espera prolongada no se ha ejercitado.
 - **Sin `--outbox` en CLI:** la ruta del outbox, del lake, los grupos y los límites de rotación están en `config/cloud.yaml` (pydantic); los tests usan una copia con `--config`. `kafka_bootstrap` en `config/infra.yaml`.
 - `make up` lanza procesos Python en segundo plano (hasta ahora solo lo hacía el demo). Lo pide el checklist del spec.
 - **Dependencias:** `confluent-kafka`, `duckdb` y `dbt-duckdb`, todas de la lista de AGENTS.md. `dbt-duckdb` arrastra `dbt-core` 1.12.7 y unas 60 dependencias transitivas (`uv.lock`: +680 líneas). Telemetría de dbt desactivada (`send_anonymous_usage_stats: false`); `.user.yml` ignorado.
@@ -44,7 +45,7 @@ make accept WP=05     -> 10 passed (10 min 29 s); demo-v1, semilla 47: 4 comprob
 Checklist manual con `docker compose stop kafka` (estado limpio, Ingestor + Monitor + puente + sink vivos, mundo de 30 min semilla 42): FogStore pasa de 0 a 1 431 `estimates`, 60 `arrivals`, 5 `band_status`; los 4 servicios en `service_health` con `ok`; Grafana `/api/health` ok, dashboard HTTP 200 y consulta de salud respondida; el latido del puente reporta `outbox_depth` = 771. Al levantar Kafka el outbox queda en 771 filas, 0 sin enviar, y el sink escribe 706 + 60 + 5 = 771 líneas: sin pérdidas.
 
 ## Resultados medidos (tablas/figuras que sirven al documento)
-**Corte de Kafka (K16)** — 2 000 mensajes a 50 msg/s (40 s), Kafka parado 30 s empezando a los 5 s de tráfico (no a mitad exacta: 30 s de corte no caben centrados en 40 s). Ejecución de `make accept WP=07`:
+**Corte de Kafka (K16)** — 2 000 mensajes a 50 msg/s (40 s), Kafka parado 30 s empezando a los 5 s de tráfico (de 5 s a 35 s sobre 40 s: centrado). Ejecución de `make accept WP=07`:
 
 | Medida | Valor |
 |---|---|
