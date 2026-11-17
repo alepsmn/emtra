@@ -1,0 +1,10 @@
+# World of test_alert_to_recommendation_roundtrip. The seed is chosen with
+# scripts/wp08_seed_selection.py so that the action_required alert opens (the test measures the
+# pipeline, not the detection). speed is the demo's.
+seed: 42
+speed: 60
+start: "06:00"
+hours: 3.5
+line_id: "19"
+faults:
+  - {type: dispatch_delay, severity: high, t0: "08:00", line_id: "19"}
