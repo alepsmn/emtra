@@ -53,6 +53,6 @@ def test_alert_to_recommendation_roundtrip():     # mundo con dispatch_delay alt
 ```
 
 ## Checklist
-- [ ] `A` incluye todas las líneas del corredor (FR10).
-- [ ] Ninguna réplica usa semillas distintas entre candidatas.
-- [ ] El REPORT trae tiempo por réplica y D por tipo de fallo.
+- [x] `A` incluye todas las líneas del corredor (FR10).
+- [x] Ninguna réplica usa semillas distintas entre candidatas.
+- [x] El REPORT trae tiempo por réplica y D por tipo de fallo.

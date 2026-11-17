@@ -137,6 +137,7 @@ No enseñar: el tramo 2 de la línea 19, que oscila por la dispersión natural d
 | Resultados raros entre ejecuciones | Procesos huérfanos: `scripts/demo_v1.sh stop` |
 | Nada llega a Kafka tras borrar el volumen a mano (`docker compose down -v`) | El outbox del puente conserva sus filas enviadas y por eso ignora los `msg_id` repetidos: borrar `data/bridge` y `data/lake` con el puente y el sink parados (`make demo-v1` ya lo hace) |
 | El mapa sale gris | No hay internet para las teselas; los datos están bien |
+| Todas las recomendaciones salen con `fallback = true` | El ActionPlanner no está vivo (`make up` lo arranca; log en `runs/cloud/action_planner.log`) o el Monitor se lanzó sin `--speed` igual a la del mundo |
 
 ## 8. Hito 5 (pendiente)
 
