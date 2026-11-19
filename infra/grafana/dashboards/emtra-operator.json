@@ -48,9 +48,243 @@
     ]
   },
   "annotations": {
-    "list": []
+    "list": [
+      {
+        "name": "Apertura",
+        "enable": true,
+        "hide": false,
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "fogstore"
+        },
+        "iconColor": "#FFB357",
+        "target": {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "fogstore"
+          },
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT opened_at AS time,\n       concat('Apertura · Línea ', line_id, ' · Tramo ', segment_id, ' · ', level) AS text\nFROM alerts\nWHERE $__timeFilter(opened_at)\nORDER BY time"
+        },
+        "filter": {
+          "exclude": false,
+          "ids": [
+            3,
+            6
+          ]
+        }
+      },
+      {
+        "name": "Cierre",
+        "enable": true,
+        "hide": false,
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "fogstore"
+        },
+        "iconColor": "#74C9D5",
+        "target": {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "fogstore"
+          },
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT closed_at AS time,\n       concat('Cierre · Línea ', line_id, ' · Tramo ', segment_id, ' · ', level) AS text\nFROM alerts\nWHERE $__timeFilter(closed_at)\nORDER BY time"
+        },
+        "filter": {
+          "exclude": false,
+          "ids": [
+            3,
+            6
+          ]
+        }
+      }
+    ]
   },
   "panels": [
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Alertas activas",
+      "description": "Alertas que los detectores mantienen abiertas.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fogstore"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 3
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "fogstore"
+          },
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT count(*) AS total FROM v_open_alerts"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#C9D1DB",
+                "value": null
+              },
+              {
+                "color": "#F2A353",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^total$/"
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Ternas fuera de rango · última banda",
+      "description": "Líneas, sentidos y tramos con LOS D, E o F en la última banda cerrada.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fogstore"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 3
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "fogstore"
+          },
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT count(*) AS total FROM band_status\nWHERE band_start = (SELECT max(band_start) FROM band_status) AND status = 'outside'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#C9D1DB",
+                "value": null
+              },
+              {
+                "color": "#E5754C",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^total$/"
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Servicios sanos",
+      "description": "Servicios con estado correcto y latido en los últimos 30 segundos, sobre los registrados.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fogstore"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 3
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "fogstore"
+          },
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT concat(count(*) FILTER (WHERE status = 'ok' AND updated_at >= now() - interval '30 seconds'), ' / ', count(*)) AS total FROM service_health"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#76B9CD"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^total$/"
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      }
+    },
     {
       "id": 1,
       "type": "status-history",
@@ -61,7 +295,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 0,
+        "y": 3,
         "w": 24,
         "h": 7
       },
@@ -75,7 +309,7 @@
           "format": "time_series",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "SELECT bands.start_at AS time,\n       concat(routes.line_id, ' · T', routes.segment_id) AS metric,\n       coalesce(array_position(ARRAY['A','B','C','D','E','F'], b.los), 0) AS value\nFROM v_line_status_latest routes\nCROSS JOIN generate_series(\n  time_bucket('15 minutes', $__timeFrom()::timestamptz),\n  $__timeTo()::timestamptz - interval '1 microsecond',\n  interval '15 minutes'\n) AS bands(start_at)\nLEFT JOIN band_status b ON (b.line_id, b.direction_id, b.segment_id, b.band_start)\n                         = (routes.line_id, routes.direction_id, routes.segment_id, bands.start_at)\nORDER BY time, metric"
+          "rawSql": "SELECT bands.start_at AS time,\n       concat(routes.line_id, ' · T', routes.segment_id) AS metric,\n       coalesce(array_position(ARRAY['A','B','C','D','E','F'], b.los), 0) AS value\nFROM (\n  SELECT line_id, direction_id, segment_id\n  FROM schedule JOIN stops USING (stop_id)\n  GROUP BY line_id, direction_id, segment_id\n  HAVING count(DISTINCT stop_id) >= 3\n) routes\nCROSS JOIN generate_series(\n  time_bucket('15 minutes', $__timeFrom()::timestamptz),\n  $__timeTo()::timestamptz - interval '1 microsecond',\n  interval '15 minutes'\n) AS bands(start_at)\nLEFT JOIN band_status b ON (b.line_id, b.direction_id, b.segment_id, b.band_start)\n                         = (routes.line_id, routes.direction_id, routes.segment_id, bands.start_at)\nORDER BY time, metric"
         }
       ],
       "fieldConfig": {
@@ -159,7 +393,7 @@
       "description": "Regularidad de las líneas de alta frecuencia. Un c_vh menor indica mayor regularidad.",
       "gridPos": {
         "x": 0,
-        "y": 7,
+        "y": 10,
         "w": 12,
         "h": 7
       },
@@ -248,7 +482,7 @@
       "description": "Proporción de llegadas puntuales en líneas de baja frecuencia. Un porcentaje mayor indica más puntualidad.",
       "gridPos": {
         "x": 12,
-        "y": 7,
+        "y": 10,
         "w": 12,
         "h": 7
       },
@@ -338,7 +572,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 17,
         "w": 6,
         "h": 7
       },
@@ -398,11 +632,11 @@
           "showAttribution": true
         },
         "basemap": {
-          "type": "carto",
-          "name": "Basemap",
+          "type": "xyz",
+          "name": "Madrid",
           "config": {
-            "theme": "dark",
-            "showLabels": true
+            "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            "attribution": "<a href=\"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer\">Esri, HERE, Garmin, OpenStreetMap contributors</a>"
           }
         },
         "layers": [
@@ -415,12 +649,12 @@
               "longitude": "lon"
             },
             "config": {
-              "showLegend": true,
+              "showLegend": false,
               "style": {
                 "size": {
-                  "fixed": 12,
-                  "min": 12,
-                  "max": 12
+                  "fixed": 6,
+                  "min": 6,
+                  "max": 6
                 },
                 "color": {
                   "field": "severity",
@@ -439,7 +673,8 @@
         "tooltip": {
           "mode": "details"
         }
-      }
+      },
+      "description": "Paradas del corredor, coloreadas por el peor estado reciente de su tramo. Verde indica dentro de rango, amarillo aviso, rojo fuera de rango y gris sin datos."
     },
     {
       "id": 4,
@@ -451,7 +686,7 @@
       },
       "gridPos": {
         "x": 6,
-        "y": 14,
+        "y": 17,
         "w": 10,
         "h": 7
       },
@@ -465,13 +700,14 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "SELECT line_id AS \"Línea\", segment_id AS \"Tramo\", level AS \"Nivel\", round(distance_to_range::numeric, 2) AS \"Distancia al rango\", array_to_string(triggers, ', ') AS \"Disparadores\", opened_at AS \"Abierta\", round(extract(epoch FROM (updated_at - opened_at)) / 60) AS \"Antigüedad (min)\" FROM v_open_alerts ORDER BY opened_at DESC"
+          "rawSql": "SELECT line_id AS \"Línea\", segment_id AS \"Tramo\", level AS \"Nivel\",\n       round(distance_to_range::numeric, 2) AS \"Distancia\",\n       array_to_string(triggers, ', ') AS \"Disparadores\",\n       to_char(opened_at AT TIME ZONE 'Europe/Madrid', 'HH24:MI') AS \"Apertura\",\n       round(extract(epoch FROM (updated_at - opened_at)) / 60) AS \"Edad (min)\"\nFROM v_open_alerts ORDER BY opened_at DESC"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "align": "auto"
+            "align": "auto",
+            "minWidth": 50
           }
         },
         "overrides": [
@@ -488,13 +724,13 @@
                     "type": "value",
                     "options": {
                       "warning": {
-                        "text": "aviso",
-                        "color": "yellow",
+                        "text": "Aviso",
+                        "color": "#E9AC45",
                         "index": 0
                       },
                       "action_required": {
-                        "text": "acción requerida",
-                        "color": "red",
+                        "text": "Acción requerida",
+                        "color": "#D94F5C",
                         "index": 1
                       }
                     }
@@ -508,12 +744,86 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Línea"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 55
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tramo"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 62
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Nivel"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 132
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Distancia"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Apertura"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Edad (min)"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 88
+              }
+            ]
           }
         ]
       },
       "options": {
-        "showHeader": true
-      }
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "description": "Distancia al rango y minutos transcurridos entre la apertura y la última actualización de la alerta."
     },
     {
       "id": 5,
@@ -525,7 +835,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 14,
+        "y": 17,
         "w": 8,
         "h": 7
       },
@@ -539,13 +849,14 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "SELECT service AS \"Servicio\", status AS \"Estado\", updated_at AS \"Última actualización\", round(extract(epoch FROM now() - updated_at)) AS \"Hace (s)\", (metrics->>'snapshots_per_min')::numeric AS \"Instantáneas/min\", (metrics->>'bands_closed')::int AS \"Bandas cerradas\", (metrics->>'outbox_depth')::int AS \"Outbox (msgs)\" FROM service_health ORDER BY service"
+          "rawSql": "SELECT service AS \"Servicio\",\n       CASE WHEN updated_at < now() - interval '30 seconds' THEN 'stale' ELSE status END AS \"Estado\",\n       to_char(updated_at AT TIME ZONE 'Europe/Madrid', 'HH24:MI:SS') AS \"Latido\",\n       (metrics->>'snapshots_per_min')::numeric AS \"Inst./min\",\n       (metrics->>'bands_closed')::int AS \"Bandas\",\n       (metrics->>'outbox_depth')::int AS \"Outbox\"\nFROM service_health ORDER BY service"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "align": "auto"
+            "align": "auto",
+            "minWidth": 50
           }
         },
         "overrides": [
@@ -562,9 +873,14 @@
                     "type": "value",
                     "options": {
                       "ok": {
-                        "text": "online",
-                        "color": "green",
+                        "text": "En línea",
+                        "color": "#56A877",
                         "index": 0
+                      },
+                      "stale": {
+                        "text": "Sin latido",
+                        "color": "#D94F5C",
+                        "index": 1
                       }
                     }
                   },
@@ -573,8 +889,9 @@
                     "options": {
                       "match": "else",
                       "result": {
-                        "color": "red",
-                        "index": 1
+                        "text": "Con error",
+                        "color": "#D94F5C",
+                        "index": 2
                       }
                     }
                   }
@@ -591,42 +908,104 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Hace (s)"
+              "options": "Estado"
             },
             "properties": [
               {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    },
-                    {
-                      "color": "yellow",
-                      "value": 15
-                    },
-                    {
-                      "color": "red",
-                      "value": 30
-                    }
-                  ]
-                }
-              },
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Latido"
+            },
+            "properties": [
               {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
+                "id": "custom.width",
+                "value": 85
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Inst./min"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 78
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bandas"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 66
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Outbox"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Servicio"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "ingestor": {
+                        "text": "Ingestor",
+                        "index": 0
+                      },
+                      "reliability_monitor": {
+                        "text": "Monitor",
+                        "index": 1
+                      },
+                      "bridge": {
+                        "text": "Puente",
+                        "index": 2
+                      },
+                      "cloud_sink": {
+                        "text": "Sink cloud",
+                        "index": 3
+                      }
+                    }
+                  }
+                ]
               }
             ]
           }
         ]
       },
       "options": {
-        "showHeader": true
-      }
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "description": "Último latido en hora de Madrid (reloj real). Inst./min son instantáneas recibidas por minuto. Outbox cuenta los mensajes pendientes."
     }
   ],
   "style": "dark"
