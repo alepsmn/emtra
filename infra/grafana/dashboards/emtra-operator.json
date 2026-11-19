@@ -5,13 +5,13 @@
     "emtra"
   ],
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": false,
   "timezone": "Europe/Madrid",
   "refresh": "5s",
   "time": {
     "from": "2026-11-16T06:00:00.000Z",
-    "to": "2026-11-16T09:30:00.000Z"
+    "to": "2026-11-16T09:00:00.000Z"
   },
   "templating": {
     "list": [
@@ -21,29 +21,13 @@
         "type": "custom",
         "query": "19,C1,170",
         "current": {
-          "text": "19",
-          "value": "19",
+          "text": "All",
+          "value": "$__all",
           "selected": true
         },
-        "options": [
-          {
-            "text": "19",
-            "value": "19",
-            "selected": true
-          },
-          {
-            "text": "C1",
-            "value": "C1",
-            "selected": false
-          },
-          {
-            "text": "170",
-            "value": "170",
-            "selected": false
-          }
-        ],
-        "multi": false,
-        "includeAll": false,
+        "options": [],
+        "multi": true,
+        "includeAll": true,
         "hide": 0
       },
       {
@@ -52,24 +36,13 @@
         "type": "custom",
         "query": "1,2",
         "current": {
-          "text": "1",
-          "value": "1",
+          "text": "All",
+          "value": "$__all",
           "selected": true
         },
-        "options": [
-          {
-            "text": "1",
-            "value": "1",
-            "selected": true
-          },
-          {
-            "text": "2",
-            "value": "2",
-            "selected": false
-          }
-        ],
-        "multi": false,
-        "includeAll": false,
+        "options": [],
+        "multi": true,
+        "includeAll": true,
         "hide": 0
       }
     ]
@@ -80,7 +53,7 @@
   "panels": [
     {
       "id": 1,
-      "type": "table",
+      "type": "status-history",
       "title": "Estado de la red",
       "datasource": {
         "type": "grafana-postgresql-datasource",
@@ -89,8 +62,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 12,
-        "h": 8
+        "w": 24,
+        "h": 7
       },
       "targets": [
         {
@@ -99,67 +72,260 @@
             "uid": "fogstore"
           },
           "refId": "A",
-          "format": "table",
+          "format": "time_series",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "SELECT line_id AS \"Línea\", segment_id AS \"Tramo\", status AS \"Estado\", los AS \"LOS\", indicator AS \"Indicador\", round(value::numeric, 2) AS \"Valor\", n_obs AS \"n\", band_start AS \"Banda\" FROM v_line_status_latest ORDER BY line_id, segment_id"
+          "rawSql": "SELECT bands.start_at AS time,\n       concat(routes.line_id, ' · T', routes.segment_id) AS metric,\n       coalesce(array_position(ARRAY['A','B','C','D','E','F'], b.los), 0) AS value\nFROM v_line_status_latest routes\nCROSS JOIN generate_series(\n  time_bucket('15 minutes', $__timeFrom()::timestamptz),\n  $__timeTo()::timestamptz - interval '1 microsecond',\n  interval '15 minutes'\n) AS bands(start_at)\nLEFT JOIN band_status b ON (b.line_id, b.direction_id, b.segment_id, b.band_start)\n                         = (routes.line_id, routes.direction_id, routes.segment_id, bands.start_at)\nORDER BY time, metric"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "auto"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Estado"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "inside": {
-                        "text": "dentro",
-                        "color": "green",
-                        "index": 0
-                      },
-                      "warning": {
-                        "text": "aviso",
-                        "color": "yellow",
-                        "index": 1
-                      },
-                      "outside": {
-                        "text": "fuera",
-                        "color": "red",
-                        "index": 2
-                      },
-                      "insufficient_data": {
-                        "text": "sin datos",
-                        "color": "#8e8e8e",
-                        "index": 3
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background"
+          "color": {
+            "mode": "fixed"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Sin datos",
+                  "color": "#646B76",
+                  "index": 0
+                },
+                "1": {
+                  "text": "A",
+                  "color": "#56A877",
+                  "index": 1
+                },
+                "2": {
+                  "text": "B",
+                  "color": "#A3BD63",
+                  "index": 2
+                },
+                "3": {
+                  "text": "C",
+                  "color": "#E5C352",
+                  "index": 3
+                },
+                "4": {
+                  "text": "D",
+                  "color": "#F2A353",
+                  "index": 4
+                },
+                "5": {
+                  "text": "E",
+                  "color": "#E5754C",
+                  "index": 5
+                },
+                "6": {
+                  "text": "F",
+                  "color": "#D94F5C",
+                  "index": 6
                 }
               }
-            ]
+            }
+          ],
+          "custom": {
+            "fillOpacity": 95,
+            "lineWidth": 0
           }
-        ]
+        },
+        "overrides": []
       },
       "options": {
-        "showHeader": true
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "showValue": "always",
+        "rowHeight": 0.87,
+        "colWidth": 0.98,
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "description": "Nivel de servicio por línea y tramo. Cada celda representa una banda de 15 minutos. El gris indica que no hay un LOS disponible."
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Indicador en el tiempo",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fogstore"
+      },
+      "description": "Regularidad de las líneas de alta frecuencia. Un c_vh menor indica mayor regularidad.",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "fogstore"
+          },
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT band_start AS time, concat(line_id, ' · T', segment_id) AS metric, value\nFROM band_status\nWHERE band_start >= $__timeFrom() AND band_start < $__timeTo()\n  AND line_id IN (${line:sqlstring}) AND segment_id IN (${segment:sqlstring})\n  AND indicator = 'cvh'\nORDER BY time, metric"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "showPoints": "always",
+            "spanNulls": false,
+            "thresholdsStyle": {
+              "mode": "area"
+            },
+            "axisLabel": "c_vh",
+            "pointSize": 5
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#56A877",
+                "value": null
+              },
+              {
+                "color": "#A3BD63",
+                "value": 0.21
+              },
+              {
+                "color": "#E5C352",
+                "value": 0.3
+              },
+              {
+                "color": "#F2A353",
+                "value": 0.4
+              },
+              {
+                "color": "#E5754C",
+                "value": 0.53
+              },
+              {
+                "color": "#D94F5C",
+                "value": 0.75
+              }
+            ]
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Puntualidad (OTP)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fogstore"
+      },
+      "description": "Proporción de llegadas puntuales en líneas de baja frecuencia. Un porcentaje mayor indica más puntualidad.",
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "fogstore"
+          },
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT band_start AS time, concat(line_id, ' · T', segment_id) AS metric, value\nFROM band_status\nWHERE band_start >= $__timeFrom() AND band_start < $__timeTo()\n  AND line_id IN (${line:sqlstring}) AND segment_id IN (${segment:sqlstring})\n  AND indicator = 'otp'\nORDER BY time, metric"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "showPoints": "always",
+            "spanNulls": false,
+            "thresholdsStyle": {
+              "mode": "area"
+            },
+            "axisLabel": "OTP",
+            "pointSize": 5
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#D94F5C",
+                "value": null
+              },
+              {
+                "color": "#E5754C",
+                "value": 0.75
+              },
+              {
+                "color": "#F2A353",
+                "value": 0.8
+              },
+              {
+                "color": "#E5C352",
+                "value": 0.85
+              },
+              {
+                "color": "#A3BD63",
+                "value": 0.9
+              },
+              {
+                "color": "#56A877",
+                "value": 0.95
+              }
+            ]
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "percentunit",
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       }
     },
     {
@@ -171,10 +337,10 @@
         "uid": "fogstore"
       },
       "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 12,
-        "h": 8
+        "x": 0,
+        "y": 14,
+        "w": 6,
+        "h": 7
       },
       "targets": [
         {
@@ -223,7 +389,7 @@
           "id": "coords",
           "lat": 40.4375,
           "lon": -3.6805,
-          "zoom": 13,
+          "zoom": 12,
           "allLayers": true
         },
         "controls": {
@@ -235,7 +401,7 @@
           "type": "carto",
           "name": "Basemap",
           "config": {
-            "theme": "light",
+            "theme": "dark",
             "showLabels": true
           }
         },
@@ -276,118 +442,6 @@
       }
     },
     {
-      "id": 3,
-      "type": "timeseries",
-      "title": "Indicador en el tiempo",
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "fogstore"
-      },
-      "description": "c_vh (líneas de alta frecuencia, eje izquierdo; sombreado = rango de referencia) u OTP (baja frecuencia, eje derecho).",
-      "gridPos": {
-        "x": 0,
-        "y": 8,
-        "w": 24,
-        "h": 9
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "fogstore"
-          },
-          "refId": "A",
-          "format": "time_series",
-          "rawQuery": true,
-          "editorMode": "code",
-          "rawSql": "SELECT band_start AS time, value AS cvh FROM band_status WHERE $__timeFilter(band_start) AND line_id = '$line' AND segment_id = $segment AND indicator = 'cvh' ORDER BY 1"
-        },
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "fogstore"
-          },
-          "refId": "B",
-          "format": "time_series",
-          "rawQuery": true,
-          "editorMode": "code",
-          "rawSql": "SELECT band_start AS time, value AS otp FROM band_status WHERE $__timeFilter(band_start) AND line_id = '$line' AND segment_id = $segment AND indicator = 'otp' ORDER BY 1"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "min": 0,
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "showPoints": "always",
-            "spanNulls": false,
-            "thresholdsStyle": {
-              "mode": "area"
-            }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 0.3
-              },
-              {
-                "color": "red",
-                "value": 0.4
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "otp"
-            },
-            "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
-              {
-                "id": "custom.thresholdsStyle",
-                "value": {
-                  "mode": "off"
-                }
-              },
-              {
-                "id": "max",
-                "value": 1
-              },
-              {
-                "id": "min",
-                "value": 0
-              },
-              {
-                "id": "unit",
-                "value": "percentunit"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      }
-    },
-    {
       "id": 4,
       "type": "table",
       "title": "Alertas abiertas",
@@ -396,9 +450,9 @@
         "uid": "fogstore"
       },
       "gridPos": {
-        "x": 0,
-        "y": 17,
-        "w": 14,
+        "x": 6,
+        "y": 14,
+        "w": 10,
         "h": 7
       },
       "targets": [
@@ -470,9 +524,9 @@
         "uid": "fogstore"
       },
       "gridPos": {
-        "x": 14,
-        "y": 17,
-        "w": 10,
+        "x": 16,
+        "y": 14,
+        "w": 8,
         "h": 7
       },
       "targets": [
@@ -574,5 +628,6 @@
         "showHeader": true
       }
     }
-  ]
+  ],
+  "style": "dark"
 }

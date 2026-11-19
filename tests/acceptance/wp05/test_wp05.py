@@ -15,6 +15,7 @@ import time
 import paho.mqtt.client as mqtt
 import psycopg
 import pytest
+import yaml
 
 from emtra_common import mqtt as emqtt
 from emtra_common.config import ROOT
@@ -59,9 +60,12 @@ def _relations_used(sql: str) -> set[str]:
 
 def _render(sql: str, line: str = "19", segment: str = "1") -> str:
     """Replace Grafana macros and variables the way Grafana would for the demo time range."""
-    sql = re.sub(r"\$__timeFilter\((\w+)\)",
-                 r"\1 BETWEEN '2026-11-16T05:00:00Z' AND '2026-11-16T10:00:00Z'", sql)
-    sql = sql.replace("$line", line).replace("$segment", segment)
+    start = "'2026-11-16T06:00:00Z'"
+    end = "'2026-11-16T09:00:00Z'"
+    sql = re.sub(r"\$__timeFilter\((\w+)\)", rf"\1 BETWEEN {start} AND {end}", sql)
+    sql = sql.replace("$__timeFrom()", start).replace("$__timeTo()", end)
+    sql = sql.replace("${line:sqlstring}", f"'{line}'")
+    sql = sql.replace("${segment:sqlstring}", f"'{segment}'")
     assert "$" not in sql, sql
     return sql
 
@@ -74,7 +78,9 @@ def test_dashboard_json_valid():
     assert d["timezone"] == "Europe/Madrid"
     assert d["refresh"] == "5s"
     assert {v["name"] for v in d["templating"]["list"]} == {"line", "segment"}
-    assert [p["type"] for p in d["panels"]] == ["table", "geomap", "timeseries", "table", "table"]
+    assert {"Estado de la red", "Mapa", "Indicador en el tiempo", "Alertas abiertas", "Salud"} <= {
+        p["title"] for p in d["panels"]
+    }
     known = _known_relations()
     for p in d["panels"]:
         assert p["targets"], f"panel {p['title']!r} has no query"
@@ -87,6 +93,25 @@ def test_dashboard_json_valid():
     for view in ("v_line_status_latest", "v_open_alerts", "stops", "service_health"):
         assert any(view in _relations_used(sql) for _, sql in _queries(d)), view
     assert "grafana_ro" in DATASOURCE.read_text(encoding="utf-8")  # read-only role
+
+
+def test_dashboard_los_thresholds_match_config():
+    bands = yaml.safe_load((ROOT / "config/bands.yaml").read_text())
+    panels = {p["title"]: p for p in _dashboard()["panels"]}
+    mapping = panels["Estado de la red"]["fieldConfig"]["defaults"]["mappings"][0]["options"]
+    colors = {entry["text"]: entry["color"] for entry in mapping.values()}
+    cvh, otp = bands["los_cvh"], bands["los_otp"][::-1]
+    for title, levels, limits in (
+        ("Indicador en el tiempo", cvh, [None, *(r["limit"] for r in cvh[:-1])]),
+        ("Puntualidad (OTP)", otp, [r["minimum"] for r in otp]),
+    ):
+        defaults = panels[title]["fieldConfig"]["defaults"]
+        assert defaults["custom"]["thresholdsStyle"]["mode"] == "area"
+        assert defaults["thresholds"] == {
+            "mode": "absolute",
+            "steps": [{"value": v, "color": colors[r["los"]]}
+                      for r, v in zip(levels, limits, strict=True)],
+        }
 
 
 def test_no_estimates_query_without_time_filter():
@@ -252,9 +277,10 @@ def test_panel_queries_run(demo_runs):
                 t0 = time.perf_counter()
                 rows = c.execute(_render(sql, line, segment)).fetchall()  # type: ignore[call-overload]
                 assert time.perf_counter() - t0 < 2, (title, line, segment)
-                if title != "Alertas abiertas":  # may legitimately be empty at the end
-                    assert rows or title.startswith("Indicador"), (title, line, segment)
-        # the indicator panel has data for line 19 (c_vh) and for 170 (OTP)
-        ind = [s for t, s in _queries(d) if t == "Indicador en el tiempo"]
-        assert any(c.execute(_render(s, "19", "1")).fetchall() for s in ind)
-        assert any(c.execute(_render(s, "170", "1")).fetchall() for s in ind)
+                if title in {"Indicador en el tiempo", "Puntualidad (OTP)"}:
+                    expected = "Puntualidad (OTP)" if line == "170" else "Indicador en el tiempo"
+                    assert bool(rows) == (title == expected), (title, line, segment)
+                    if rows:
+                        assert any(value is not None for _, _, value in rows)
+                elif title != "Alertas abiertas":  # may legitimately be empty at the end
+                    assert rows, (title, line, segment)
