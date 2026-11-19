@@ -124,11 +124,11 @@ def test_identical_policies_give_zero_damping(clean_state, pool):
                                   "hold_max_s": 0.0})         # a hold that never holds
     ev = evaluate(w.request_for(clean_state), clean_state.as_of, pool=pool,
                   candidates=[CandidateSpec("no_action", {}), twin], replications=10)
-    assert ev.replications == 10
-    assert ev.damping.shape == (2, 10)
-    assert (ev.damping == 0.0).all()                           # exact, every replication
-    assert (ev.a_pax_min[0] == ev.a_pax_min[1]).all()
+    assert ev.replications == 10 and ev.recommendation is not None
+    assert (ev.a_pax_min[0] == ev.a_pax_min[1]).all()          # A identical, replication by one
     assert len(set(ev.a_pax_min[0])) == 10                     # replications do differ
+    (c,) = [c for c in ev.recommendation.candidates if c.action == "hold"]
+    assert c.damping_mean == 0.0 and c.damping_ci95 == (0.0, 0.0)   # exact
 
 
 def test_hold_damps_dispatch_bunching(tmp_path, pool):                               # K9
@@ -150,6 +150,7 @@ def test_hold_damps_dispatch_bunching(tmp_path, pool):                          
         a_none = ev.a_pax_min[[c.action for c in ev.candidates].index("no_action")]
         rows.append({"seed": seed, "stop_id": best.params["stop_id"], "rank": best.rank,
                      "damping_mean": best.damping_mean, "damping_ci95": best.damping_ci95,
+                     "dA_pax_min": best.ewt_acc_mean_pax_min - float(np.mean(a_none)),
                      "a_none_mean": float(np.mean(a_none)), "a_none_min": float(np.min(a_none)),
                      "a_none": [float(x) for x in a_none]})
     w.record("hold_damps_dispatch_bunching", {"offset_min": cfg.test_state_offset_min,
@@ -179,7 +180,7 @@ def test_ranking_is_sorted_by_A(clean_state, pool):  # noqa: N802
             assert c.onboard_delay_pax_min >= 0
         else:
             assert c.onboard_delay_pax_min == 0
-            assert c.damping_mean in (0, None)     # None: D undefined in this request
+            assert c.damping_mean in (0, None)     # None: mean A of no action <= 0
     # the means are those of the replications (A covers every line of the corridor)
     order = [(c.action, c.params.get("stop_id")) for c in cands]
     for i, spec in enumerate(ev.candidates):
@@ -201,7 +202,7 @@ def test_budget_respected(clean_state, pool):
         if partial_expected:                                   # a partial answer: 10 <= R < 30
             assert ev.recommendation is not None
             assert 10 <= ev.recommendation.replications < 30
-            assert ev.recommendation.replications == ev.replications == ev.damping.shape[1]
+            assert ev.recommendation.replications == ev.replications == ev.a_pax_min.shape[1]
         else:                                                  # fewer than 10: nothing
             assert ev.recommendation is None and ev.replications < 10
         time.sleep(2 * delay_s + 0.5)                          # let the pool drain

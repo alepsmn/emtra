@@ -4,10 +4,11 @@ batch_size: 10            # replications are counted in complete batches; an ans
 horizon_s: 3600           # A covers the passengers arriving in [as_of, as_of + horizon_s)
 tail_s: 1800              # the run goes on this long after it so that their waits end (> H max 1200 s + delay)
 workers: 4                # processes of the pool, started and warmed before the first request
-root_seed: 8000           # emtra_common.rng root of the replication seeds
+root_seed: 8000           # emtra_common.rng root of the replication seeds and of the bootstrap
+bootstrap_resamples: 2000 # paired percentile bootstrap of D (95 % interval)
 budget_margin_s: 0.5      # of the request's budget, kept for the trip back to the fog (see REPORT WP8)
 consumer_group: action-planner
 # test_hold_damps_dispatch_bunching only: minutes from the fault's t0 to the instant at which the
-# CorridorState is built. Chosen among 15, 30 and 45 with calibration seeds 2000-2019
-# (scripts/wp08_calibration.py, rule in choose_offset); see REPORT WP8.
-test_state_offset_min: 45
+# CorridorState is built. 15, by principle and not by result: the only offset with the fault still
+# inside the corridor, and close to when the Monitor asks in practice (about t0 + 17.5 min).
+test_state_offset_min: 15

@@ -9,7 +9,8 @@ Per replication and candidate:
 - recovery time and peak deviation of the alerted tern's indicator (c_vh if HF, OTP if LF),
   computed by the Monitor's own Indicators on the replication's true arrivals;
 - on-board delay: sum of hold x load (not part of D; shown as a con).
-D_r = 1 - A_candidate,r / A_no_action,r.
+D = 1 - mean_r(A_candidate,r) / mean_r(A_no_action,r), with a 95 % paired percentile bootstrap
+interval (the same replication indices for both); undefined if mean(A_no_action) <= 0.
 """
 
 import multiprocessing
@@ -54,6 +55,7 @@ class PlannerConfig(BaseModel):
     batch_size: int
     horizon_s: float
     tail_s: float
+    bootstrap_resamples: int
     workers: int
     root_seed: int
     budget_margin_s: float
@@ -193,19 +195,37 @@ class Evaluation:
     replications: int                     # complete ones, a multiple of the batch size
     runtime_s: float
     a_pax_min: np.ndarray                 # [candidate, replication]
-    damping: np.ndarray                   # [candidate, replication]: D_r
     results: list[list[ReplicaResult]]    # [replication][candidate]
     recommendation: Recommendation | None  # None: fewer than one batch within the budget
 
 
 def _mean_ci(x: np.ndarray) -> tuple[float, tuple[float, float]]:
-    """Mean and 95 % t interval (for D, the paired interval of the differences)."""
+    """Mean and 95 % t interval."""
     m = float(np.mean(x))
     sd = float(np.std(x, ddof=1)) if len(x) > 1 else 0.0
     if sd == 0.0:
         return m, (m, m)
     half = float(stats.t.ppf(0.975, len(x) - 1)) * sd / np.sqrt(len(x))
     return m, (m - half, m + half)
+
+
+def damping_ci(a_cand: np.ndarray, a_none: np.ndarray,
+               idx: np.ndarray) -> tuple[float, tuple[float, float]] | None:
+    """D = 1 - mean(A_cand) / mean(A_none) and its 95 % percentile interval over the bootstrap
+    resamples `idx` [resample, replication] (the same indices for both: paired). None if
+    mean(A_none) <= 0, where D is not defined."""
+    if float(np.mean(a_none)) <= 0:
+        return None
+    d = float(1.0 - np.mean(a_cand) / np.mean(a_none))
+    boot = 1.0 - a_cand[idx].mean(axis=1) / a_none[idx].mean(axis=1)
+    lo, hi = np.percentile(boot, [2.5, 97.5])
+    return d, (float(lo), float(hi))
+
+
+def bootstrap_indices(cfg: PlannerConfig, alert_id: object, event_time: datetime,
+                      n: int) -> np.ndarray:
+    return rng(cfg.root_seed, "bootstrap", str(alert_id), event_time.isoformat()).integers(
+        0, n, size=(cfg.bootstrap_resamples, n))
 
 
 def _mean_or_none(values: list[float | None]) -> float | None:
@@ -243,30 +263,28 @@ def evaluate(request: RecommendationRequest, event_time: datetime, *, pool: Exec
     results = [f.result() for f in futures[:done]]
     a = np.array([[res[i].a_pax_min for res in results] for i in range(len(specs))],
                  dtype=float).reshape(len(specs), done)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        damping = 1.0 - a / a[none]
-    damping[none] = 0.0
-    runtime = (clock.now() - t0).total_seconds()
     rec = None
     if done >= cfg.batch_size:
+        idx = bootstrap_indices(cfg, request.alert_id, event_time, done)
+        candidates_ = _rank(specs, results, a, none, idx)
         rec = Recommendation(
             recommendation_id=make_recommendation_id(request.alert_id, event_time, False),
-            alert_id=request.alert_id, fallback=False, runtime_s=runtime, replications=done,
-            candidates=_rank(specs, results, a, damping, none))
-    return Evaluation(specs, done, runtime, a, damping, results, rec)
+            alert_id=request.alert_id, fallback=False,
+            runtime_s=(clock.now() - t0).total_seconds(), replications=done,
+            candidates=candidates_)
+    return Evaluation(specs, done, (clock.now() - t0).total_seconds(), a, results, rec)
 
 
 def _rank(specs: list[CandidateSpec], results: list[list[ReplicaResult]], a: np.ndarray,
-          damping: np.ndarray, none: int) -> list[Candidate]:
+          none: int, idx: np.ndarray) -> list[Candidate]:
     """Candidates by mean A ascending (ties: evaluation order, no action first)."""
-    # D is only defined where the no-action excess wait is positive
-    defined = bool(np.all(a[none] > 0))
     a_none, _ = _mean_ci(a[none])
     out = []
     for i in sorted(range(len(specs)), key=lambda i: float(np.mean(a[i]))):
         spec = specs[i]
         a_mean, a_ci = _mean_ci(a[i])
-        d_mean, d_ci = _mean_ci(damping[i]) if defined else (None, None)
+        dmp = damping_ci(a[i], a[none], idx)
+        d_mean, d_ci = (None, None) if dmp is None else dmp
         onboard = float(np.mean([res[i].onboard_delay_pax_min for res in results]))
         pros, cons = ACTION_TEXT[spec.action]
         figures = f"accumulated excess wait {a_mean:.0f} pax·min"
