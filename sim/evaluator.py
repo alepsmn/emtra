@@ -53,6 +53,7 @@ class PlannerConfig(BaseModel):
     replications: int
     batch_size: int
     horizon_s: float
+    tail_s: float
     workers: int
     root_seed: int
     budget_margin_s: float
@@ -81,6 +82,7 @@ class ReplicaResult:
     recovery_time_s: float | None    # None: not recovered within the horizon
     peak_deviation: float | None     # None: no band with a value
     onboard_delay_pax_min: float
+    waiting_at_end: int = 0          # cohort passengers still waiting when the tail ends
 
 
 def candidate_specs(corridor: Corridor, line_id: str, segment_id: int) -> list[CandidateSpec]:
@@ -126,7 +128,7 @@ def _recovery(eng: Engine, base: Indicators, tern: tuple[str, int, int],
     ind.close_band(band_start(as_of) - BAND, before)
     mine = sorted((arrival(r[5] - 1, r[3], r[6]) for r in eng.truth if r[0] == line_id),
                   key=lambda a: a.arrival_time)
-    end = eng.start + timedelta(seconds=eng.horizon_s)
+    end = eng.start + timedelta(seconds=eng.cohort_end_s)    # the tail does not count
     b = band_start(as_of)
     if b < as_of:
         b += BAND
@@ -146,17 +148,18 @@ def _recovery(eng: Engine, base: Indicators, tern: tuple[str, int, int],
 
 
 def run_replica(state: CorridorState, tern: tuple[str, int, int], specs: list[CandidateSpec],
-                seed: int, horizon_s: float) -> list[ReplicaResult]:
-    """Every candidate from the same state with the same root seed (CRN)."""
+                seed: int, horizon_s: float, tail_s: float) -> list[ReplicaResult]:
+    """Every candidate from the same state with the same root seed (CRN). The run lasts
+    horizon_s + tail_s; A covers the passengers arriving in the first horizon_s."""
     corridor, sim_cfg, mon_cfg, base = _context()
     out = []
     for spec in specs:
         eng = Engine(corridor, sim_cfg, seed, policy=spec.policy(), initial_state=state,
-                     horizon_s=horizon_s)
+                     horizon_s=horizon_s + tail_s, cohort_s=horizon_s)
         eng.run()
         recovery, peak = _recovery(eng, base, tern, mon_cfg.close_after_bands)
         out.append(ReplicaResult(eng.excess_wait_pax_min(), recovery, peak,
-                                 eng.onboard_delay_s / 60))
+                                 eng.onboard_delay_s / 60, eng.cohort_waiting_at_end()))
     return out
 
 
@@ -227,7 +230,8 @@ def evaluate(request: RecommendationRequest, event_time: datetime, *, pool: Exec
     tern = (request.line_id, request.direction_id, request.segment_id)
     futures: list[Future] = [
         pool.submit(replica_fn, request.state, tern, specs,
-                    replica_seed(cfg.root_seed, request.alert_id, event_time, r), cfg.horizon_s)
+                    replica_seed(cfg.root_seed, request.alert_id, event_time, r), cfg.horizon_s,
+                    cfg.tail_s)
         for r in range(total)]
     wait(futures, timeout=max(0.0, budget - (clock.now() - t0).total_seconds()))
     done = 0                                # complete batches, in replication order

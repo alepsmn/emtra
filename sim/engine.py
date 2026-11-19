@@ -103,6 +103,7 @@ class Engine:
         initial_state: CorridorState | None = None,
         start: datetime | None = None,
         horizon_s: float | None = None,
+        cohort_s: float | None = None,
         env: simpy.Environment | None = None,
         on_snapshot: Callable[[str, str], None] | None = None,
     ) -> None:
@@ -135,6 +136,10 @@ class Engine:
         # absolute sim time of the end of the run
         self.horizon_s = min(self.t0_s + horizon_s if horizon_s else self.service_end_s,
                              self.service_end_s)
+        # A (WP8) is the excess wait of the passengers arriving in [start of the run, this);
+        # the run may go on after it (the tail) so that their waits end
+        self.cohort_end_s = min(self.t0_s + cohort_s, self.horizon_s) if cohort_s \
+            else self.horizon_s
         n_slots = int(np.ceil(self.horizon_s / SLOT_S))
         self.slot_group = [band_group(self.start + timedelta(seconds=i * SLOT_S))
                            for i in range(n_slots)]
@@ -145,6 +150,7 @@ class Engine:
         self.initial_departures: dict[tuple[int, str], float] = {}   # those set by the state
         self.truth: list[tuple] = []
         self.agg: dict[tuple[int, str, int], list[float]] = {}
+        self.cohort_wait_s: dict[tuple[int, str], float] = {}   # boarded cohort, (stop, line)
         self.snapshot_lines: list[str] = []
         self.onboard_delay_s = 0.0     # sum of hold x load on board (pax*s)
         # (stop, line) -> (passengers already waiting at the start, seconds since the last bus)
@@ -335,6 +341,11 @@ class Engine:
         if k:
             t = ps.times[ps.ptr : ps.ptr + k]
             ps.ptr += k
+            mine = t < self.cohort_end_s
+            if mine.any():
+                key = (g, line_id)
+                self.cohort_wait_s[key] = (self.cohort_wait_s.get(key, 0.0)
+                                           + float(np.sum(now - t[mine])))
             slot = (t // SLOT_S).astype(int)
             uniq, inv = np.unique(slot, return_inverse=True)
             n = np.bincount(inv)
@@ -402,29 +413,58 @@ class Engine:
     def faults_frame(self) -> pd.DataFrame:
         return faults_frame(self.faults, self.start)
 
-    def excess_wait_pax_min(self) -> float:
-        """A (WP8): wait accumulated by every passenger of the corridor, all lines, from the
-        start of the run to its end, minus the same with scheduled headways (pax*min).
+    def _scheduled_at_stops(self) -> dict[tuple[int, str], np.ndarray]:
+        """(stop, line) -> scheduled arrivals of the day at that stop (sim seconds, sorted):
+        departure + k * (link mean + dwell mean) at the k-th served stop (as the timetable)."""
+        if not hasattr(self, "_sched_cache"):
+            step = self.cfg.link_mean_s + self.cfg.dwell_mean_s
+            ids = self.stop_ids
+            out = {}
+            for ln in self.c.lines:
+                dep = np.array([(t - self.start).total_seconds()
+                                for t, _ in _departures(self.c, self.cfg)[ln.line_id]])
+                for k, sid in enumerate(self.c.served_stops(ln.line_id)):
+                    out[(ids.index(sid), ln.line_id)] = dep + k * step
+            self._sched_cache = out
+        return self._sched_cache
 
-        Real: the wait of who boarded plus, for who is still at the stop at the end, the wait
-        so far. Scheduled: a passenger arriving x seconds before the end with a bus every H
-        waits min(U, x), U uniform in (0, H): H/2 if x >= H, else x - x^2 / (2H). The scheduled
-        term does not depend on the control policy (the passengers are the same), so the
-        difference of A between two policies is the difference of their real waits.
+    def cohort_waiting_at_end(self) -> int:
+        """Passengers of the cohort still at their stop when the run ends (should be ~0)."""
+        return sum(int(np.sum(ps.times[ps.ptr:] < self.cohort_end_s)) for ps in self.pax.values())
+
+    def excess_wait_pax_min(self, line_id: str | None = None) -> float:
+        """A (WP8): excess wait of the cohort of passengers arriving in [start of the run,
+        cohort end), all lines (or one), in pax*min: their real wait minus their wait with the
+        timetable, both complete (not truncated at the cohort end; the run goes on for a tail).
+
+        Real: from arrival to boarding. Scheduled: from arrival to the next scheduled bus of the
+        line at that stop (emtra_common.timetable). Passengers already waiting at the start (the
+        expected queue of sim/state.py) are taken as arrived evenly over the gap since the line's
+        last pass, and both terms count their wait from the start only. A cohort passenger still
+        waiting when the run ends counts the wait until then in both terms. The scheduled term
+        does not depend on the control policy, so the difference of A between two policies is
+        the difference of their real waits.
         """
-        end = self.horizon_s
-        real = sum(ws for _, ws in self.agg.values())
-        sched = 0.0
+        end, t0, t1 = self.horizon_s, self.t0_s, self.cohort_end_s
+        sched_at = self._scheduled_at_stops()
+        real = sched = 0.0
         for (g, lid), ps in self.pax.items():
-            real += float(np.sum(end - ps.times[ps.ptr:]))
-            headway = self.c.line(lid).headway_s
+            if line_id is not None and lid != line_id:
+                continue
+            rest = ps.times[ps.ptr:]
+            real += self.cohort_wait_s.get((g, lid), 0.0) + float(np.sum(end - rest[rest < t1]))
+            s = sched_at[(g, lid)]
+
+            def next_bus(t: np.ndarray, s: np.ndarray = s) -> np.ndarray:
+                i = np.searchsorted(s, t, side="left")
+                return np.where(i < len(s), s[np.minimum(i, len(s) - 1)], np.inf)
+
             n0, gap = self.queue0.get((g, lid), (0, 0.0))
-            if n0:   # already waiting at the start: the next scheduled bus is H - gap away
-                h0 = headway[self._group_at(self.t0_s)]
-                sched += n0 * min(max(h0 - gap, 0.0), end - self.t0_s)
+            if n0:
+                arrived = t0 - gap + (np.arange(n0) + 0.5) * gap / n0
+                sched += float(np.sum(np.clip(next_bus(arrived), t0, end) - t0))
             t = ps.times[n0:]
-            h = np.array([headway[grp] for grp in self.slot_group])[(t // SLOT_S).astype(int)]
-            x = end - t
-            sched += float(np.sum(np.where(x >= h, h / 2, x - x * x / (2 * h))))
+            t = t[t < t1]
+            sched += float(np.sum(np.minimum(next_bus(t), end) - t))
         return (real - sched) / 60
 

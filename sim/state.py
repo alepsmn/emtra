@@ -5,12 +5,16 @@
   A bus that has not entered yet is dispatched when its estimate says.
 - On-board load: the mean load of the demand profile after that stop (fluid model).
 - Queue at a stop: expected arrivals since the line's last bus there, rate x elapsed time. The
-  last pass of a line at a stop is derived from the bus positions with the nominal times.
+  last pass of a line at a stop is derived from the bus positions with the nominal times; at a
+  stop ahead of every bus of the line in the state, from the timetable (its last scheduled
+  pass). Only the queue uses the timetable there: the policy still sees no bus ahead.
 - The disturbance is not modelled: it is implicit in the positions (a broken-down bus is not
   there; a gap is a gap). Limitation: an ongoing slowdown is not known.
 """
 
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 from contracts.payloads import CorridorState
 from emtra_common.corridor import Corridor
@@ -75,8 +79,17 @@ def apply_state(eng: "Engine", state: CorridorState) -> None:
     for (g, line_id), t in last_pass.items():
         eng.last_departure[(g, line_id)] = t + cfg.dwell_mean_s
         eng.initial_departures[(g, line_id)] = t + cfg.dwell_mean_s
-        if g in loads[line_id]:           # the line boards here (not its last stop)
-            rate = (eng.scale * cfg.board_weight_per_h[g] * cfg.line_factor[line_id]
+    sched = eng._scheduled_at_stops()
+    for ln in c.lines:
+        for g in loads[ln.line_id]:       # the stops where the line boards (not its last one)
+            t = last_pass.get((g, ln.line_id))
+            if t is None:                 # ahead of every bus of the line: the timetable's
+                s = sched[(g, ln.line_id)]
+                i = int(np.searchsorted(s, now, side="right"))
+                if i == 0:
+                    continue
+                t = float(s[i - 1])
+            rate = (eng.scale * cfg.board_weight_per_h[g] * cfg.line_factor[ln.line_id]
                     * cfg.profile[group] / 3600)
             gap = max(0.0, now - t)
-            eng.queue0[(g, line_id)] = (int(round(rate * gap)), gap)
+            eng.queue0[(g, ln.line_id)] = (int(round(rate * gap)), gap)
