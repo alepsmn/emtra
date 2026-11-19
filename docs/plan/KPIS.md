@@ -16,7 +16,7 @@ Todo se mide en simulación contra la verdad del simulador (`runs/<run_id>/truth
 | K6 | F9 | Retardo de detección | mediana de `t_open − t0` | ≤ 30 min (2 bandas) | E2 | 6 |
 | K7 | F9 | Falsas alertas | alertas sin fallo por línea·sentido·semana | ≤ 1 | E2 | 6 |
 | K8 | F9 | EWMA+CUSUM frente a Shewhart | recall de ambos a igual tasa de falsas alertas | ≥ Shewhart (se informa) | E2 | 6 |
-| K9 | F10 | Amortiguación de la acción mejor rankeada | D medio e IC 95 % por escenario | D > 0 con IC que excluye 0 en ≥ 70 % de escenarios | E3 | 12 |
+| K9 | F10 | Amortiguación de la acción mejor rankeada | por escenario, D = 1 − media(A_acción)/media(A_no acción) sobre las R réplicas, con IC 95 % por bootstrap pareado (percentil); A = exceso de espera de la cohorte que llega en la hora siguiente, contra el horario, sin truncar (spec WP-08, 8.3) | D > 0 con IC que excluye 0 en ≥ 70 % de escenarios | E3 | 12 |
 | K10 | F10 | Tiempo de respuesta del ranking | p95 de `runtime_s` | ≤ presupuesto (120 s) | E3 | 12 |
 | K11 | F11 | Decisiones con verificación | decisiones con `emtra.recovery` / decisiones | 100 % | E5 | 12 |
 | K12 | F4 | Error del MAE calculado | \|MAE con llegadas derivadas − MAE con llegadas verdaderas\| por banda de horizonte | ≤ 5 s | E1 | 10 |

@@ -26,12 +26,13 @@ Regla de retención (`emtra_common/holding.py`, función pura, simplificación d
 - Candidatas: `no_action` + un `hold` por punto de control que sirve la línea alertada, situado en el tramo alertado o después, excluida la última parada de la línea, máximo 2, en orden de recorrido (`emtra_common.holding.hold_control_points`). El respaldo usa el primero de esa lista. (Con la lectura literal, "aguas abajo del tramo", una alerta en el tramo 2 no tendría candidata: el corredor tiene 2 tramos y puntos de control en S04 y S08.)
 - R réplicas (default 30); **la réplica r usa la misma semilla raíz para todas las candidatas** (CRN).
 - Por réplica y candidata:
-  - `A` = exceso de espera acumulado (pax·min) de **todas las líneas del corredor** desde `as_of` hasta el horizonte: Σ (espera real − espera con headways programados). Real: la espera de quien sube y, de quien sigue en la parada al final, la espera hasta ese momento. Programada: H/2 por pasajero, o `x − x²/(2H)` si llega a `x < H` del final; no depende de la acción;
-  - `recovery_time_s`: primer instante (inicio de banda, desde `as_of`) desde el que el indicador de la terna alertada (c_vh en HF, OTP en LF) queda dentro de rango 2 bandas completas seguidas; `None` si no ocurre;
+  - `A` = exceso de espera (pax·min) de la **cohorte** de pasajeros de **todas las líneas del corredor** que llegan en `[as_of, as_of + horizon_s)`, incluida la cola inicial (su espera cuenta desde `as_of`): Σ (espera real − espera programada), las dos **completas, sin truncar**. Real: de la llegada a la subida. Programada: de la llegada a la siguiente salida programada de su línea en esa parada (horario de `emtra_common/timetable`). El motor simula `horizon_s + tail_s` (`config/action_planner.yaml`: 3 600 + 1 800 s; `tail_s` > H máximo 1 200 s + retraso) para que esas esperas terminen; quien siga esperando al final de la cola cuenta con la espera hasta entonces en ambos términos (medido: 0). La referencia no depende de la acción;
+  - cola inicial: `λ · (as_of − último paso de la línea)`, repartida uniformemente en ese hueco; en las paradas por delante de todos los buses de la línea en el estado, el último paso es el programado según el horario;
+  - `recovery_time_s`: primer instante (inicio de banda, desde `as_of`) desde el que el indicador de la terna alertada (c_vh en HF, OTP en LF) queda dentro de rango 2 bandas completas seguidas; `None` si no ocurre. Solo bandas completas de `[as_of, as_of + horizon_s)`: la cola no entra (tampoco en `peak_deviation`);
   - `peak_deviation`: máx. de la distancia al rango del indicador (positiva = fuera);
   - ambos se calculan con `Indicators` del core del Monitor sobre las llegadas verdaderas de la réplica: el indicador no se reimplementa;
   - `onboard_delay_pax_min`: Σ hold × carga a bordo. No entra en D; se muestra como contra.
-- `D_r = 1 − A_cand,r / A_none,r`; media e IC 95 % (t pareada). Si `A_none,r ≤ 0` en alguna réplica, D no está definido y `damping_mean`/`damping_ci95` van a `None` (ver REPORT de WP8).
+- `D = 1 − media_r(A_cand,r) / media_r(A_none,r)` (razón de medias sobre las réplicas); IC 95 % por bootstrap pareado (los mismos índices de réplica para ambas), percentil, con `emtra_common.rng` y `bootstrap_resamples` (2 000) en `config/action_planner.yaml`. `damping_mean`/`damping_ci95` = `None` si `media(A_none) ≤ 0`. (Antes: media de `D_r = 1 − A_cand,r / A_none,r`, que no está definida por principio cuando `A_none,r ≤ 0` en una réplica, cosa que pasa en el 5–8 % de ellas; ver REPORT de WP8.)
 - Ranking por media de `A` ascendente. `pros` / `cons`: texto fijo por acción (Tabla 7 del H3: hold = "sin recursos extra; rápido de aplicar" / "retrasa a los pasajeros a bordo") + las cifras.
 - Paralelo con `ProcessPoolExecutor`, arrancado y caliente antes de la primera petición. Por lotes de 10 réplicas: al vencer `budget_s` se devuelven los lotes completos que haya (campo `replications` con el valor real, múltiplo de 10); si no hay ninguno, nada.
 - Servicio: consume `emtra.rec_requests.v1`, produce `emtra.recommendations.v1` con `correlation_id = alert_id`. El estado sale del mensaje; la nube no lee FogStore.
@@ -40,10 +41,10 @@ Regla de retención (`emtra_common/holding.py`, función pura, simplificación d
 ```python
 def test_holding_rule():                          # h_fwd = H -> 0 ; h_fwd = H/2 -> alpha*H/2 ; tope hold_max_s
 def test_state_roundtrip_runs():                  # estado construido de una ejecución a las 08:30 -> Engine arranca y simula 1 h sin error; nº de buses en ruta coincide
-def test_identical_policies_give_zero_damping():  # candidata == no_action -> D_r == 0 exacto en todas las réplicas
+def test_identical_policies_give_zero_damping():  # candidata == no_action -> A idéntica réplica a réplica y D == 0 exacto
 def test_hold_damps_dispatch_bunching():          # dispatch_delay alta, 10 escenarios: D medio > 0 con IC que excluye 0 en >= 7     (K9)
-                                                  # mide el evaluador, no la detección: estado en t0 + test_state_offset_min (config/action_planner.yaml,
-                                                  # elegido con semillas 2000–2019); escenarios = bloque wp08_validation de config/data_split.yaml
+                                                  # mide el evaluador, no la detección: estado en t0 + test_state_offset_min = 15 min (por principio: único desfase
+                                                  # con el fallo aún en el corredor; el Monitor pide hacia t0 + 17,5 min); escenarios = bloque wp08_validation de config/data_split.yaml
 def test_ranking_is_sorted_by_A():
 def test_budget_respected():                      # simulación artificialmente lenta -> respuesta parcial o nada en <= budget + 5 s
 def test_runtime():                               # R=30, 2 candidatas + no_action, 1 h, 2 workers -> < 120 s (@slow)                 (K10)

@@ -108,8 +108,8 @@ class Candidate:
     ewt_acc_ci95: tuple[float, float] | None
     recovery_time_mean_s: float | None
     peak_deviation_mean: float | None
-    damping_mean: float | None         # None también si A de no acción <= 0 en alguna réplica (D no definido)
-    damping_ci95: tuple[float, float] | None
+    damping_mean: float | None         # D = 1 - mean(A cand)/mean(A no acción) sobre las réplicas; None también si mean(A no acción) <= 0
+    damping_ci95: tuple[float, float] | None   # bootstrap pareado, percentil
     onboard_delay_pax_min: float | None
     pros: list[str]
     cons: list[str]

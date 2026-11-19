@@ -25,7 +25,7 @@ Un agente, un WP por sesión, en este orden. Cada WP termina con algo ejecutable
 | WP5 | [WP-05-dashboard-demo.md](WP-05-dashboard-demo.md) | H4 | F6 + `make demo-v1` | [x] |
 | WP6 | [WP-06-validation-v1.md](WP-06-validation-v1.md) | H4 (doc) | arnés de experimentos, E1 y E2 | [x] |
 | WP7 | [WP-07-bridge-cloud.md](WP-07-bridge-cloud.md) | H5 | Kafka, puente con outbox, sink local, dbt | [x] |
-| WP8 | [WP-08-action-planner.md](WP-08-action-planner.md) | H5 | F10: ranking por simulación pareada; respaldo D5 | [x] (un test en rojo, K9: decisión pendiente sobre D, ver REPORT) |
+| WP8 | [WP-08-action-planner.md](WP-08-action-planner.md) | H5 | F10: ranking por simulación pareada; respaldo D5 | [x] |
 | WP9 | [WP-09-decisions-recovery.md](WP-09-decisions-recovery.md) | H5 | F11: decisión, hold aplicado en el mundo, recuperación | [ ] |
 | WP10 | [WP-10-f4-accuracy.md](WP-10-f4-accuracy.md) | H5 | F4: precisión de las estimaciones | [ ] |
 | WP11 | [WP-11-f12-interval.md](WP-11-f12-interval.md) | H5 | F12: intervalo calibrado y API de pasajero | [ ] |
