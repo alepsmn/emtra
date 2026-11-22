@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EMTRA Pasajero</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  :root {
+    --bg: #f4f5f2; --card: #ffffff; --fg: #1b1f1d; --muted: #66706b; --line: #dfe3df;
+    --accent: #0f6b4f; --accent-soft: #e2f0ea;
+    --ok: #1d7a46; --ok-soft: #e3f3e8; --late: #b3261e; --late-soft: #fbe7e5;
+    --early: #1f5fa8; --early-soft: #e3edf9; --warn: #8a5a00; --warn-soft: #fdf1d6;
+    --l19: #d63a2f; --lC1: #2a6fcf; --l170: #2f8f4e; --head: #0f6b4f; --on-accent: #ffffff;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121513; --card: #1b201d; --fg: #e8ece9; --muted: #9aa49f; --line: #2c332f;
+      --accent: #5cc49a; --accent-soft: #1d3329;
+      --ok: #6fd393; --ok-soft: #1b3324; --late: #ff8a80; --late-soft: #3a1f1d;
+      --early: #8ab8ff; --early-soft: #1c2a3d; --warn: #f2c05c; --warn-soft: #362b14;
+      --head: #173b2e; --on-accent: #0d1f17;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    background: var(--head); color: #fff;
+    padding: 14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left));
+  }
+  .bar { max-width: 1100px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 6px 16px;
+         align-items: baseline; justify-content: space-between; }
+  header h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: .2px; }
+  header h1 span { font-weight: 500; opacity: .8; }
+  .clock { font: 500 13px "JetBrains Mono", ui-monospace, monospace; opacity: .9; }
+  main {
+    max-width: 1100px; margin: 0 auto; display: grid; gap: 16px;
+    padding: 16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left));
+  }
+  @media (min-width: 900px) { main { grid-template-columns: 420px 1fr; align-items: start; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+          padding: 16px; min-width: 0; }
+  form { display: flex; gap: 8px; }
+  label.lbl { display: block; font-size: 12px; font-weight: 600; letter-spacing: .6px;
+              text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  input, select, button {
+    font: inherit; border-radius: 10px; border: 1px solid var(--line); background: var(--bg);
+    color: var(--fg); padding: 10px 12px; min-width: 0;
+  }
+  input { width: 90px; font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 700; }
+  select { flex: 1; }
+  button { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 600;
+           cursor: pointer; }
+  .stop-head { margin: 18px 0 4px; display: flex; align-items: baseline; gap: 10px; }
+  .stop-head h2 { margin: 0; font-size: 20px; text-wrap: balance; }
+  .code { font: 700 13px "JetBrains Mono", ui-monospace, monospace; color: var(--muted); }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .line { border-top: 1px solid var(--line); padding: 14px 0 12px; }
+  .line-top { display: flex; align-items: center; gap: 12px; }
+  .badge { min-width: 46px; height: 32px; padding: 0 8px; border-radius: 8px; color: #fff;
+           display: inline-flex; align-items: center; justify-content: center;
+           font: 700 15px "JetBrains Mono", ui-monospace, monospace; }
+  .eta { margin-left: auto; text-align: right; }
+  .eta b { font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .eta small { font-size: 13px; color: var(--muted); margin-left: 3px; }
+  .rows { margin-top: 10px; display: grid; gap: 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 13.5px; }
+  .row .when { font-variant-numeric: tabular-nums; }
+  .pill { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
+  .on_time { background: var(--ok-soft); color: var(--ok); }
+  .late { background: var(--late-soft); color: var(--late); }
+  .early { background: var(--early-soft); color: var(--early); }
+  .none { background: var(--bg); color: var(--muted); }
+  .warn { margin-top: 10px; background: var(--warn-soft); color: var(--warn); font-size: 13px;
+          padding: 8px 10px; border-radius: 8px; }
+  .sched { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .sched span { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--fg); }
+  .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+  .foot { font-size: 12px; color: var(--muted); margin-top: 14px; border-top: 1px solid var(--line);
+          padding-top: 10px; }
+  #map { height: 62vh; min-height: 340px; border-radius: 10px; }
+  .map-card { padding: 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: var(--muted);
+            padding: 8px 6px 2px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+              margin-right: 5px; vertical-align: -1px; }
+  .busmark { width: 30px; height: 20px; border-radius: 6px; color: #fff; border: 2px solid #fff;
+             font: 700 11px/16px "JetBrains Mono", ui-monospace, monospace; text-align: center;
+             box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .err { color: var(--late); font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>EMTRA <span>· Próximo autobús</span></h1>
+    <div class="clock" id="clock">—</div>
+  </div>
+</header>
+<main>
+  <section class="card">
+    <label class="lbl" for="num">Número de parada</label>
+    <form id="f">
+      <input id="num" inputmode="numeric" placeholder="4" autocomplete="off" aria-label="Número de parada">
+      <select id="sel" aria-label="Elegir parada"></select>
+      <button type="submit">Ver</button>
+    </form>
+    <div id="err" class="err" hidden></div>
+    <div id="board"><p class="empty" style="margin-top:16px">Escribe el número de la parada o elígela en la lista.</p></div>
+    <div class="foot">
+      Tiempo <b>estimado</b>: lo que indica el sistema ahora. Tiempo <b>programado</b>: el del horario de la línea.
+      Ocupación del autobús: no disponible.<br>
+      <span id="srcnote"></span>
+    </div>
+  </section>
+  <section class="card map-card">
+    <div id="map" role="img" aria-label="Mapa con la posición estimada de los autobuses"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const css = getComputedStyle(document.documentElement);
+const lineColor = (l) => css.getPropertyValue(`--l${l}`).trim() || "#555";
+let META, TZ, current = null, timer = null;
+const stopsById = {};
+
+const hhmm = (iso) => new Date(iso).toLocaleTimeString("es-ES",
+  { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+const hhmmss = (iso) => new Date(iso).toLocaleTimeString("es-ES",
+  { timeZone: TZ, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function delayText(b) {
+  if (b.delay_s == null) return ['none', 'sin horario'];
+  const m = Math.round(Math.abs(b.delay_s) / 60);
+  if (b.punctuality === "late") return ["late", `+${m} min de retraso`];
+  if (b.punctuality === "early") return ["early", `${m} min adelantado`];
+  return ["on_time", m === 0 ? "a su hora" : `a tiempo (${b.delay_s > 0 ? "+" : "−"}${m} min)`];
+}
+
+function minutesText(m) { return m < 1 ? ["Llegando", ""] : [Math.floor(m), "min"]; }
+
+function renderBoard(d) {
+  const s = stopsById[d.stop_id];
+  let html = `<div class="stop-head"><h2>${esc(s.name)}</h2><span class="code">${d.stop_id}</span></div>
+    <p class="sub">Tramo ${d.segment_id} · líneas ${s.lines.join(", ")}</p>`;
+  for (const ln of d.lines) {
+    const first = ln.buses[0];
+    let eta = `<span class="empty">Ningún autobús en ruta${ln.next_scheduled.length ? ` · programado ${hhmm(ln.next_scheduled[0])}` : ""}</span>`;
+    if (first) {
+      const [n, u] = minutesText(first.minutes);
+      eta = `<b>${n}</b><small>${u}</small>`;
+    }
+    const rows = ln.buses.map((b, i) => {
+      const [cls, txt] = delayText(b);
+      const sched = b.sched_arrival ? `programado ${hhmm(b.sched_arrival)}` : "";
+      return `<div class="row"><span class="when">${i === 0 ? "Este" : "Siguiente"}: estimado <b>${hhmm(b.eta)}</b>${sched ? " · " + sched : ""}</span>
+        <span class="pill ${cls}">${txt}</span></div>`;
+    }).join("");
+    const next = ln.next_scheduled.length
+      ? `<div class="sched">Próximos según horario: ${ln.next_scheduled.map((t) => `<span>${hhmm(t)}</span>`).join(" · ")}</div>` : "";
+    const warn = ln.low_confidence
+      ? `<div class="warn">Servicio irregular en este tramo: la estimación puede fallar más de lo habitual.</div>` : "";
+    html += `<div class="line"><div class="line-top">
+        <span class="badge" style="background:${lineColor(ln.line_id)}">${esc(ln.line_id)}</span>
+        <span class="eta">${eta}</span></div>
+      <div class="rows">${rows}</div>${next}${warn}</div>`;
+  }
+  $("board").innerHTML = html;
+  $("clock").textContent = `Hora simulada ${hhmmss(d.as_of)}`;
+}
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+}
+
+async function refresh() {
+  try {
+    if (current) renderBoard(await getJSON(`/api/board?stop_id=${encodeURIComponent(current)}`));
+    drawBuses(await getJSON("/api/buses"));
+    $("err").hidden = true;
+  } catch (e) {
+    $("err").textContent = `No se pudo actualizar: ${e.message}`;
+    $("err").hidden = false;
+  }
+}
+
+function choose(stop) {
+  const raw = String(stop).trim().toUpperCase();
+  const id = /^\d+$/.test(raw) ? "S" + raw.padStart(2, "0") : raw;
+  if (!stopsById[id]) {
+    $("err").textContent = `La parada "${stop}" no existe. Hay paradas de la 1 a la ${META.stops.length}.`;
+    $("err").hidden = false;
+    return;
+  }
+  current = id;
+  $("sel").value = id;
+  $("num").value = String(parseInt(id.slice(1), 10));
+  try { localStorage.setItem("emtra-stop", id); } catch (e) {}
+  if (location.hash !== "#" + id) history.replaceState(null, "", "#" + id);
+  highlightStop(id);
+  refresh();
+}
+
+/* ---------- map ---------- */
+let map, busLayer, stopMarkers = {};
+function initMap() {
+  map = L.map("map", { zoomControl: true, attributionControl: true });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; OpenStreetMap",
+  }).addTo(map);
+  const all = [];
+  for (const ln of META.lines) {
+    L.polyline(ln.path, { color: lineColor(ln.line_id), weight: 4, opacity: .55 }).addTo(map);
+  }
+  for (const s of META.stops) {
+    const m = L.circleMarker([s.lat, s.lon], { radius: 6, color: "#1b1f1d", weight: 2,
+      fillColor: "#fff", fillOpacity: 1 }).addTo(map);
+    m.bindTooltip(`${s.stop_id.slice(1)} · ${s.name}`);
+    m.on("click", () => choose(s.stop_id));
+    stopMarkers[s.stop_id] = m;
+    all.push([s.lat, s.lon]);
+  }
+  map.fitBounds(all, { padding: [24, 24] });
+  busLayer = L.layerGroup().addTo(map);
+  $("legend").innerHTML = META.lines.map((l) => `<span><i style="background:${lineColor(l.line_id)}"></i>Línea ${esc(l.line_id)}</span>`).join("")
+    + `<span>Posición estimada a partir de los tiempos de llegada</span>`;
+}
+function highlightStop(id) {
+  for (const [sid, m] of Object.entries(stopMarkers)) {
+    m.setStyle(sid === id ? { radius: 10, fillColor: getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() }
+                          : { radius: 6, fillColor: "#fff" });
+  }
+}
+function drawBuses(d) {
+  busLayer.clearLayers();
+  for (const b of d.buses) {
+    const icon = L.divIcon({ className: "", iconSize: [30, 20], iconAnchor: [15, 10],
+      html: `<div class="busmark" style="background:${lineColor(b.line_id)}">${esc(b.line_id)}</div>` });
+    const s = stopsById[b.next_stop_id];
+    const m = Math.round(b.time_left_s / 60);
+    L.marker([b.lat, b.lon], { icon }).addTo(busLayer)
+      .bindPopup(`<b>Línea ${esc(b.line_id)}</b> · ${esc(b.bus_id)}<br>Próxima parada: ${esc(s.name)} (${b.next_stop_id.slice(1)})<br>${m < 1 ? "llegando" : "en " + m + " min"}`);
+  }
+  if (!current) $("clock").textContent = `Hora simulada ${hhmmss(d.as_of)}`;
+}
+
+/* ---------- start ---------- */
+(async () => {
+  META = await getJSON("/api/meta");
+  TZ = META.timezone;
+  for (const s of META.stops) stopsById[s.stop_id] = s;
+  $("sel").innerHTML = `<option value="">Elegir parada…</option>` + META.stops.map((s) =>
+    `<option value="${s.stop_id}">${parseInt(s.stop_id.slice(1), 10)} · ${esc(s.name)}</option>`).join("");
+  $("srcnote").textContent = (META.synthetic ? "Datos sintéticos del simulador" : "Datos reales")
+    + (META.source === "run" ? " · reproducción de una ejecución grabada" : " · FogStore en vivo");
+  initMap();
+  $("f").addEventListener("submit", (e) => { e.preventDefault(); choose($("num").value); });
+  $("sel").addEventListener("change", (e) => e.target.value && choose(e.target.value));
+  let start = location.hash.slice(1);
+  if (!start) { try { start = localStorage.getItem("emtra-stop") || ""; } catch (e) {} }
+  if (start) choose(start); else refresh();
+  timer = setInterval(refresh, META.refresh_s * 1000);
+})().catch((e) => { $("err").textContent = `Error al cargar: ${e.message}`; $("err").hidden = false; });
+</script>
+</body>
+</html>

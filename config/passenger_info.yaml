@@ -1,0 +1,10 @@
+source: run                       # run: replay a recorded run (no Docker) | fogstore: live FogStore
+run_dir: runs/e2_slowdown_high_3030_s1   # source=run; slowdown on segment 1 from 07:15
+replay_start: "07:00"             # source=run; local time on the corridor's service date
+replay_end: "23:59"
+replay_speed: 10                  # source=run; simulated seconds per wall second
+snapshot_max_age_s: 90            # a stop whose last poll is older than this shows no buses
+next_scheduled: 3                 # scheduled arrivals listed per line
+refresh_s: 10                     # page polling period
+host: 127.0.0.1
+port: 8000
