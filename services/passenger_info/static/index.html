@@ -95,6 +95,25 @@
              font: 700 11px/16px "JetBrains Mono", ui-monospace, monospace; text-align: center;
              box-shadow: 0 1px 4px rgba(0,0,0,.35); }
   .err { color: var(--late); font-size: 13px; margin-top: 8px; }
+  .stopmark { width: 24px; height: 24px; border-radius: 50%; background: #fff; color: #1b1f1d;
+              border: 2.5px solid #1b1f1d; box-shadow: 0 1px 4px rgba(0,0,0,.4); cursor: pointer;
+              font: 700 11px/19px "JetBrains Mono", ui-monospace, monospace; text-align: center; }
+  .stopmark:hover { transform: scale(1.15); }
+  .stopsel { position: relative; width: 180px; height: 84px; pointer-events: none; }
+  .stopsel .pin { position: absolute; left: 68px; top: 0; width: 44px; height: 44px;
+                  background: var(--head); border: 3px solid #fff; border-radius: 50% 50% 50% 0;
+                  transform: rotate(-45deg); box-shadow: 0 3px 10px rgba(0,0,0,.45); }
+  .stopsel .pin span { display: block; transform: rotate(45deg); color: #fff; text-align: center;
+                       font: 700 16px/38px "JetBrains Mono", ui-monospace, monospace; }
+  .stopsel .ring { position: absolute; left: 70px; top: 33px; width: 40px; height: 40px;
+                   border-radius: 50%; border: 3px solid var(--head);
+                   animation: pulse 1.8s ease-out infinite; }
+  .stopsel .name { position: absolute; left: 0; right: 0; top: 62px; text-align: center; }
+  .stopsel .name b { display: inline-block; background: var(--head); color: #fff;
+                     font: 600 12px/1 Inter, system-ui, sans-serif; padding: 5px 8px;
+                     border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.35); white-space: nowrap; }
+  @keyframes pulse { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.6); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .stopsel .ring { animation: none; opacity: .5; } }
 </style>
 </head>
 <body>
@@ -214,7 +233,7 @@ function choose(stop) {
 }
 
 /* ---------- map ---------- */
-let map, busLayer, stopMarkers = {};
+let map, busLayer, selMarker, stopMarkers = {};
 function initMap() {
   map = L.map("map", { zoomControl: true, attributionControl: true });
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -224,24 +243,33 @@ function initMap() {
   for (const ln of META.lines) {
     L.polyline(ln.path, { color: lineColor(ln.line_id), weight: 4, opacity: .55 }).addTo(map);
   }
+  busLayer = L.layerGroup().addTo(map);
   for (const s of META.stops) {
-    const m = L.circleMarker([s.lat, s.lon], { radius: 6, color: "#1b1f1d", weight: 2,
-      fillColor: "#fff", fillOpacity: 1 }).addTo(map);
-    m.bindTooltip(`${s.stop_id.slice(1)} · ${s.name}`);
+    const m = L.marker([s.lat, s.lon], { icon: stopIcon(s) }).addTo(map);
+    m.bindTooltip(`${stopNum(s.stop_id)} · ${esc(s.name)}`, { direction: "top", offset: [0, -12] });
     m.on("click", () => choose(s.stop_id));
     stopMarkers[s.stop_id] = m;
     all.push([s.lat, s.lon]);
   }
+  selMarker = L.marker([0, 0], { interactive: false, zIndexOffset: 2000 });
   map.fitBounds(all, { padding: [24, 24] });
-  busLayer = L.layerGroup().addTo(map);
   $("legend").innerHTML = META.lines.map((l) => `<span><i style="background:${lineColor(l.line_id)}"></i>Línea ${esc(l.line_id)}</span>`).join("")
     + `<span>Posición estimada a partir de los tiempos de llegada</span>`;
 }
+const stopNum = (id) => String(parseInt(id.slice(1), 10));
+function stopIcon(s) {
+  return L.divIcon({ className: "", iconSize: [24, 24], iconAnchor: [12, 12],
+    html: `<div class="stopmark">${stopNum(s.stop_id)}</div>` });
+}
 function highlightStop(id) {
-  for (const [sid, m] of Object.entries(stopMarkers)) {
-    m.setStyle(sid === id ? { radius: 10, fillColor: getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() }
-                          : { radius: 6, fillColor: "#fff" });
-  }
+  const s = stopsById[id];
+  selMarker.setLatLng([s.lat, s.lon]).setIcon(L.divIcon({ className: "", iconSize: [180, 84],
+    iconAnchor: [90, 53],
+    html: `<div class="stopsel"><div class="ring"></div><div class="pin"><span>${stopNum(id)}</span></div>
+           <div class="name"><b>${esc(s.name)}</b></div></div>` }));
+  if (!map.hasLayer(selMarker)) selMarker.addTo(map);
+  for (const [sid, m] of Object.entries(stopMarkers)) m.setOpacity(sid === id ? 0 : 1);
+  map.flyTo([s.lat, s.lon], Math.max(map.getZoom(), 15), { duration: 0.6 });
 }
 function drawBuses(d) {
   busLayer.clearLayers();
@@ -250,7 +278,7 @@ function drawBuses(d) {
       html: `<div class="busmark" style="background:${lineColor(b.line_id)}">${esc(b.line_id)}</div>` });
     const s = stopsById[b.next_stop_id];
     const m = Math.round(b.time_left_s / 60);
-    L.marker([b.lat, b.lon], { icon }).addTo(busLayer)
+    L.marker([b.lat, b.lon], { icon, zIndexOffset: 1000 }).addTo(busLayer)
       .bindPopup(`<b>Línea ${esc(b.line_id)}</b> · ${esc(b.bus_id)}<br>Próxima parada: ${esc(s.name)} (${b.next_stop_id.slice(1)})<br>${m < 1 ? "llegando" : "en " + m + " min"}`);
   }
   if (!current) $("clock").textContent = `Hora simulada ${hhmmss(d.as_of)}`;
