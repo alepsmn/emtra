@@ -2,11 +2,36 @@
 
 Texto listo para pegar en el documento (en inglés, mismo estilo que el H3: frase inicial en negrita y explicación corta). Las notas en español entre `>` son instrucciones para vosotros y no se pegan.
 
-> **Origen de las cifras:** `experiments/reports/h4.md` y `kpis.csv` a 16-nov, commit `f969550`. Si WP6 vuelve a ejecutar `make experiments`, revisad las tablas 55 y 56 contra esos ficheros antes de entregar.
+> **Ámbito: solo H4 (entrega del 30-nov).** Lo implementado después del primer incremento (nube, ranking de acciones) no se describe aquí: va en `h5_sections.md`, que se escribe como cambios sobre este texto. Este fichero se congela al entregar.
 >
-> **Numeración:** los dos capítulos nuevos van entre el 5 (Design) y el actual 6 (Conclusions). Conclusions pasa a ser 8 y References 9. Las tablas nuevas son 51–56; la del Anexo A pasa a ser Table 57.
+> **Origen de las cifras:** `experiments/reports/h4.md` y `kpis.csv` a 16-nov, commit `f969550`. Revisado el 19-nov: `kpis.csv` sale idéntico byte a byte tras WP7 y WP8, así que las tablas 56 y 57 siguen valiendo. Las cifras de H4 son las de ese commit: no se regeneran desde `main` cuando avance H5 (los WP de H5 pueden cambiar el simulador o los servicios).
+>
+> **Numeración:** los dos capítulos nuevos van entre el 5 (Design) y el actual 6 (Conclusions). Conclusions pasa a ser 8 y References 9. Las tablas nuevas son 51–57; la del Anexo A pasa a ser Table 58.
 >
 > **Portada:** cambiar "H3" por "H4" y añadir una línea al historial del documento.
+
+## Mapa de pegado en `EMTRA_H4_draft.docx`
+
+> Busca con Ctrl+F el texto de la columna "Ancla" (está tal cual en el borrador). Estilos del documento: capítulo = Título 1 (Heading 1), sección = Título 2, pie de tabla o figura = Título 4, **debajo** de la tabla o figura, como en el resto del H3. Orden recomendado: de abajo arriba (así los anclas de arriba no se mueven).
+
+| # | Bloque de este fichero | Ancla en el borrador (Ctrl+F) | Qué hacer |
+|---|---|---|---|
+| 1 | — | `Changes with respect to the H3 design (working section for H4)` (al final, tras References) | **Borrar** el título, su párrafo y su tabla de 18 filas: la sustituye la Tabla 52 (bloque B, 6.2) |
+| 2 | — | `7. References` | Renumerar a `9. References` |
+| 3 | — | `Table 51. Work Organization Chart` (Anexo A) | Renumerar a `Table 58`; rellenar horas de H4 (E.2) |
+| 4 | — | `Figure 19. Sequence — ingestion` … `Figure 25` (Anexos B y C) | Si la captura del dashboard entra como Figure 19, correr estas a 20–26 |
+| 5 | D.2 | `Risk analysis and KPIs:` (6.3 Future work) | **Borrar** esta entrada: los objetivos ya están en la Tabla 55 y los parámetros en la Tabla 53 |
+| 6 | D.2 | `Simulator (H3):`, `Implementation and first demo (H3):`, `Implementation and final demo (H4):` | Borrar las tres y poner en su lugar las dos entradas de D.2 |
+| 7 | D.1 | `Only alerts that need a decision reach the operator.` (último punto de 6.2 Conclusions) | Añadir el párrafo de D.1 **debajo**, mismo estilo de lista |
+| 8 | A.5 | `nine non-functional` (6.2 Conclusions) | Cambiar `nine` por `two` |
+| 9 | A.4 | `Implementation and validation have not been carried out yet.` (6.2 Conclusions) | Sustituir esa frase por la de A.4 |
+| 10 | — | `6. Conclusions and future work` y sus secciones 6.1–6.3 | Renumerar a `8.`, `8.1`, `8.2`, `8.3` |
+| 11 | B y C | Justo **antes** de `6. Conclusions and future work` (tras la Tabla 50 y el párrafo de 5.11) | Insertar el capítulo 6 (bloque B) y a continuación el 7 (bloque C), con las Tablas 51–57 |
+| 12 | A.3 | `Table 50. Increments.` (5.11) | En la tabla de encima, columna *Milestone*: incremento 1 → H4, incremento 2 → H5 |
+| 13 | A.2 | `The prototype therefore records contiguous segments` (5.11) | Sustituir desde esa frase hasta el final del párrafo por el texto de A.2 |
+| 14 | A.1 | `Scope. The project delivers the design` (Introduction) | Dejar `Scope.` en negrita y sustituir **todo** el resto del párrafo por el texto de A.1 |
+| 15 | — | Índice, lista de figuras, lista de tablas (`Table of Contents`, `Table of Figures`, `Tables`) | Clic derecho → Actualizar campos → toda la tabla |
+| 16 | — | Portada e historial | "H3" → "H4"; línea nueva en el historial |
 
 ---
 
@@ -14,7 +39,7 @@ Texto listo para pegar en el documento (en inglés, mismo estilo que el H3: fras
 
 > Cinco sustituciones. El resto del H3 no se toca: las diferencias con el prototipo van en la Tabla 52.
 
-**A.1 — Introduction, párrafo "Scope".** Sustituir la frase que dice que el registro se construye con el horario y las estimaciones que EMT publica y que los datos sintéticos se ajustan al histórico, por:
+**A.1 — Introduction, párrafo "Scope".** Sustituir todo el párrafo tras "Scope." (que dice que el registro se construye con el horario y las estimaciones que EMT publica y que los datos sintéticos se ajustan al histórico) por:
 
 > The project delivers the design of the system and its validation on a prototype. The prototype runs on a synthetic corridor: the timetable, the arrival estimates, the passenger arrivals and the failures are generated by the corridor simulator, which also keeps the ground truth that every measure is compared with. The data source is behind an interface, so an operator deployment would replace the simulator by the EMT API or by the AVL feed (D10).
 
@@ -85,6 +110,8 @@ Building the prototype forced some decisions that the design had left open, and 
 
 **The simulated corridor.** Twelve stops in two segments of six, shared by three lines: 19 and C1 (high frequency, measured by c_vh) and 170 (low frequency, measured by OTP). The simulator publishes a snapshot of arrival estimates per stop every 30 s, as the EMT API would, limited to two buses per line, and stores the true arrivals, the waiting times and the injected faults. The fault catalogue has five types (slowdown, blocked segment, breakdown, dispatch delay, demand surge) and three severities.
 
+**The corridor is designed for its structure, not copied from a real route.** Line labels and stop names are illustrative, and the stop coordinates only place the stops on the map: no computation uses geometry. The simulator works with travel times between stops and dwell times at stops, and the indicator with arrival times per stop and segment, so a real route shape would give the same results. The parameters are set by hand to plausible values: about 400 m between stops, 90 s of mean travel time per link plus dwell, which gives a commercial speed of about 13 km/h, and peak headways of 6, 7.5 and 20 minutes. What the corridor reproduces on purpose is what stresses the system: lines that share stops, high- and low-frequency lines, and bunching. Dwell time grows with the passengers who board, so a late bus finds more passengers, dwells longer and falls further behind, while the bus behind it catches up; headways spread along the route even on a fault-free day.
+
 **The parameters left open in the design are now set.** Detector limits are calibrated on 20 fault-free baseline days for an in-control average run length of 2,000 bands (Table 53). Everything else is in versioned configuration files.
 
 | Cells | Residuals | EWMA L | CUSUM h | Shewhart z_max |
@@ -96,7 +123,7 @@ Building the prototype forced some decisions that the design had left open, and 
 
 ### 6.4. Demonstration
 
-The demonstration starts from an empty system with one command and runs the corridor from 06:00 to 10:15 at 60 times real time. The first hour is warm-up. At 08:00 a high-severity slowdown starts in segment 1. The dashboard shows the level of service of every line and segment per 15-minute band, the map of the corridor, the indicator over time, the open alerts and the health of the services. The regularity of line 19 in segment 1 degrades, the detectors signal the drift, and an "action required" alert opens at 08:30. The run ends by checking that this alert is stored in FogStore. Two consecutive runs give identical contents.
+The demonstration starts from an empty system with one command and runs the corridor from 06:00 to 10:15 at 60 times real time. The first hour is warm-up. At 08:00 a high-severity slowdown starts in segment 1. The dashboard shows three counters at the top (active alerts, line segments out of range in the last band, healthy services); the level of service of every line and segment per 15-minute band; the regularity of the high-frequency lines and the punctuality of the low-frequency line over time, against the level-of-service bands, with the opening and closing of each alert marked on the time axis; the map of the corridor; the open alerts; and the health of the services. The regularity of line 19 in segment 1 degrades, the detectors signal the drift, and an "action required" alert opens at 08:30. The slowdown then reaches the other lines that cross the segment: line 170 opens an alert at 08:45 and line C1, downstream in segment 2, at 09:00. The alerts close between 09:15 and 09:30, when the indicator is back in range after the slowdown ends; the first increment does not act on the corridor. The run ends by checking that the alert of line 19 is stored in FogStore. Two consecutive runs give identical contents.
 
 > Aquí va una captura del dashboard con la alerta abierta, como figura. Numerarla como la siguiente a la última del cuerpo (Figure 19) y correr las de los anexos, o ponerla sin número dentro del texto si no queréis renumerar.
 
@@ -124,14 +151,40 @@ Each work package has acceptance tests written before the code, with numerical t
 
 ### 7.2. Validation method
 
+**Validation follows the chain of the system.** Each stage answers one question, and a stage is only worth measuring if the previous one holds. Data: is what the system sees reliable? Alert: does it warn when it should, and only then? Action: does acting improve the service against doing nothing, in time, and is the outcome verified? Table 55 defines the key performance indicators (KPIs) of every stage, with their target, experiment and increment. All of them were defined before measuring; the first increment measures the data and alert stages, and the second measures the action stage and the remaining functionalities.
+
+| KPI | Functionality | What it measures | Target | Experiment | Increment |
+|---|---|---|---|---|---|
+| K1 | F1 | Share of emitted estimates that reach the register | ≥ 99 % | E1, E5 | 1 (end to end at 2) |
+| K2 | F1 | Error of the derived arrival, 95th percentile | ≤ 15 s | E1 | 1 |
+| K3 | F1 | Share of never-fulfilled estimates whose bus does arrive, no later than the last estimate + 5 min | ≤ 1 % | E1, E2 | 1 |
+| K4 | F3 | Error of c_vh against c_vh from true arrivals, mean absolute per band | ≤ 0.05 | E1 | 1 |
+| K5 | F9 | Detection recall, high-severity segment faults | ≥ 80 % | E2 | 1 |
+| K6 | F9 | Detection delay, median | ≤ 30 min | E2 | 1 |
+| K7 | F9 | False alerts per line, direction and week | ≤ 1 | E2 | 1 |
+| K8 | F9 | Recall of EWMA + CUSUM minus Shewhart, same false-alert rate | ≥ 0 | E2 | 1 |
+| K17 | F9 | "Action required" alerts per service hour (operator load) | ≤ 2 | E2 | 1 |
+| K9 | F10 | Reduction of the passengers' excess wait by the best-ranked action against no action, paired simulation | Reduction with a 95 % interval above 0 in ≥ 70 % of scenarios | E3 | 2 |
+| K10 | F10 | Response time of the ranking, 95th percentile | ≤ budget (120 s) | E3 | 2 |
+| K11 | F11 | Decisions followed by a recovery check | 100 % | E5 | 2 |
+| K12 | F4 | Error of the computed estimate accuracy (MAE) against the true one | ≤ 5 s | E1 | 2 |
+| K13 | F12 | Coverage of the 90 % arrival interval | 0.90 ± 0.02 | E4 | 2 |
+| K14 | F12 | Width of the interval per cell against one global interval | ≤ global | E4 | 2 |
+| K15 | F12 | Latency of the passenger query, 95th percentile at 50 requests/s | < 200 ms | E5 | 2 |
+| K16 | D4 | Messages lost after a cloud outage | 0 | E5 | 2 |
+
+*Table 55. Validation KPIs.*
+
 The system is validated in batch against the ground truth of the simulator, on seeds that were not used to calibrate anything. Two experiments cover the first increment:
 
 - **E1, normal operation.** Ten fault-free days. Measures the record (F1) and the indicator (F3).
 - **E2, detection.** Twenty fault-free days and 92 runs with one injected fault each. Forty of them are the target population: high-severity slowdown and blocked segment, in both segments, ten seeds each. The other 52 (lower severities and the single-vehicle faults) are reported without a target.
 
+The second increment adds three experiments: E3 ranks the actions on scenarios with a vehicle fault, E4 calibrates the arrival interval on calibration seeds and evaluates it on validation seeds, and E5 runs the full stack with a two-minute cloud outage, an automatic decision on every recommendation and load on the passenger query.
+
 An alert is attributed to a fault if it opens in the segment of the fault or an adjacent one within 60 minutes of its start. The size of a fault is measured independently of the detector, as the change of the true indicator between the run with the fault and the same seed without it.
 
-The targets were set before measuring and have not been changed. Two definitions were corrected after the first run and are declared here: the detection target applies to high-severity segment faults, because lower severities change the true c_vh by less than 0.05; and a never-fulfilled estimate counts as false only if the bus arrives within five minutes of the last estimated time.
+The targets were set before measuring and have not been changed. Two definitions were corrected after the first run and are declared here. The detection target applies to high-severity segment faults only (it first included medium severity); lower severities and single-vehicle faults are reported with the size of their effect and no target. A never-fulfilled estimate counts as false only if the bus arrives within five minutes of the last estimated time.
 
 ### 7.3. Results
 
@@ -139,7 +192,7 @@ The targets were set before measuring and have not been changed. Two definitions
 |---|---|---|---|---|---|
 | K1 | Estimates that reach the register | 100 % | 632,216 | ≥ 99 % | Yes |
 | K2 | Error of the derived arrival, 95th percentile | 14.5 s | 30,902 | ≤ 15 s | Yes |
-| K3 | False never-fulfilled estimates | 0.73 (0.67–0.78) | 294 | ≤ 0.01 | No |
+| K3 | Share of never-fulfilled estimates whose bus did arrive | 0.73 (0.67–0.78) | 294 | ≤ 0.01 | No |
 | K4 | Error of c_vh against c_vh from true arrivals, mean absolute | 0.009 | 2,158 | ≤ 0.05 | Yes |
 | K5 | Detection recall, high-severity segment faults | 0.65 (0.50–0.78) | 40 | ≥ 0.80 | No |
 | K6 | Detection delay, median | 45 min | 26 | ≤ 30 min | No |
@@ -147,7 +200,7 @@ The targets were set before measuring and have not been changed. Two definitions
 | K8 | Recall of EWMA + CUSUM minus Shewhart, same run length | +0.275 | 40 | ≥ 0 | Yes |
 | K17 | "Action required" alerts per service hour | 0.003 | 20 days | ≤ 2 | Yes |
 
-*Table 55. KPIs of the first increment.*
+*Table 56. KPIs of the first increment.*
 
 | Fault | Segment | Detected | Median delay | Change of true c_vh |
 |---|---|---|---|---|
@@ -156,7 +209,7 @@ The targets were set before measuring and have not been changed. Two definitions
 | Blocked segment | 2 | 4/10 | 45 min | +0.12 |
 | Slowdown | 2 | 3/10 | 45 min | +0.14 |
 
-*Table 56. Detection of high-severity segment faults by type and segment.*
+*Table 57. Detection of high-severity segment faults by type and segment.*
 
 > Figura opcional: `experiments/reports/detection_delay.png`.
 
@@ -164,9 +217,9 @@ The targets were set before measuring and have not been changed. Two definitions
 
 **The record and the indicator are accurate.** Derived arrivals are within 14.5 s of the true ones; the limit of polling every 30 s is 15 s. The indicator computed by the system differs from the one computed with true arrivals by 0.009 on average, far below the width of a level-of-service class.
 
-**Detection depends on the size of the effect.** In segment 1 a high-severity fault is detected 19 times out of 20. In segment 2 the same faults raise the true c_vh by 0.12 to 0.14, which is inside the natural spread of that segment on a fault-free day (0.36 ± 0.18), and are detected 7 times out of 20. Recall over the whole population is 0.65 and the target is not met.
+**Detection depends on the size of the effect.** In segment 1 a high-severity fault is detected 19 times out of 20. In segment 2 the same faults raise the true c_vh by 0.12 to 0.14, which is inside the natural spread of line 19 in that segment at the morning peak on a fault-free day (c_vh 0.36 ± 0.18), and are detected 7 times out of 20. Recall over the whole population is 0.65 and the target is not met.
 
-**The alert arrives three bands after the fault.** The median delay is 45 minutes against a target of 30. A band is 15 minutes, and the detectors need several bands of evidence at the calibrated run length. The delay is the price of the low false-alert rate: one false alert every six weeks per line and direction.
+**The alert arrives three bands after the fault.** The median delay is 45 minutes against a target of 30. A band is 15 minutes, and the detectors need several bands of evidence at the calibrated run length. The delay is the price of the low false-alert rate: one false alert every six weeks per line and direction, against a target of one a week. The in-control run length was fixed before validation and has not been tuned on its results; a shorter one would trade false alerts for delay, and is a setting to agree with the operator.
 
 **EWMA and CUSUM are worth their complexity.** At the same in-control run length they detect 26 of the 40 faults; a Shewhart chart detects 15.
 
@@ -178,15 +231,17 @@ The targets were set before measuring and have not been changed. Two definitions
 
 **What the three unmet KPIs mean for the design.** The detection design works as specified where the disturbance is large and sustained. Two changes would address the rest and are left as future work: a second, faster rule on the headway gap of individual vehicles, and bands shorter than 15 minutes on high-frequency lines.
 
+**Detection sets the ceiling for any action.** The actions of the second increment are triggered by alerts, so they inherit these results. A hold can only help on the faults that are detected, two out of three in the target population, and it starts about three bands after the fault. Every false alert would become a hold that delays the passengers on board for nothing. The benefit for the passenger is roughly the share of faults detected times the improvement of the action once triggered: an excellent action on a poor detection gives little. This is why the detection was validated first, and why K9 will be read together with K5 and K6.
+
 ---
 
 ## D. Añadidos a Conclusions y Future work (ahora capítulo 8)
 
 **D.1 — Conclusions, añadir al final de la lista:**
 
-> **The first increment confirms the measuring half of the loop.** Arrivals are derived within 15 s and the indicator within 0.01 of the truth. Sustained faults with a large effect are detected with almost no false alerts; small or short ones are not, and the alert takes three bands. The limits of a per-band indicator are now measured, not assumed.
+> **The first increment confirms the measuring half of the loop.** Arrivals are derived within 15 s and the indicator within 0.01 of the truth. Sustained faults with a large effect are detected with almost no false alerts; small or short ones are not, and the alert takes three bands. The limits of a per-band indicator are now measured, not assumed, and they bound what the actions of the second increment can achieve.
 
-**D.2 — Future work: sustituir las entradas "Simulator (H3)", "Implementation and first demo (H3)" e "Implementation and final demo (H4)" por:**
+**D.2 — Future work: borrar la entrada "Risk analysis and KPIs" (ya resuelta por las Tablas 53 y 55) y sustituir las entradas "Simulator (H3)", "Implementation and first demo (H3)" e "Implementation and final demo (H4)" por:**
 
 > **Second increment (H5):** F10 with hold evaluated by paired simulation, F11 with the hold applied in the simulated world and the recovery verified, F4 and F12, and the cloud tier with the bridge and its outbox; every KPI checked in the four operating situations.
 >
@@ -196,8 +251,9 @@ The targets were set before measuring and have not been changed. Two definitions
 
 ## E. Lo que falta por hacer a mano
 
-1. Captura del dashboard (sección 6.4). Nadie lo ha visto renderizado todavía.
+1. Captura del dashboard (sección 6.4), sacada del vídeo, con la alerta abierta. La descripción de 6.4 ya corresponde al dashboard nuevo (rama `dashboard-v2`).
 2. Anexo A: horas por persona de este hito.
 3. Actualizar índice, lista de tablas y lista de figuras en Word.
-4. Comprobar el límite de páginas: los capítulos 6 y 7 añaden unas 4.
+4. Comprobar el límite de páginas: los capítulos 6 y 7 añaden unas 5.
 5. Diagramas generados por WP13 (despliegue real, clases por servicio), si queréis sustituir o completar los de los anexos.
+6. Borrar la sección de trabajo del final del borrador (fila 1 del mapa).
