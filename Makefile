@@ -1,4 +1,4 @@
-.PHONY: setup lint test it accept up down demo-v1 baseline experiments demo-final dbt calibrate it-resilience docs
+.PHONY: setup lint test it accept up down demo-v1 baseline experiments demo-final dbt calibrate it-resilience docs passenger
 
 COMPOSE = docker compose -f infra/docker-compose.yml
 
@@ -55,6 +55,10 @@ dbt:
 
 calibrate:
 	@echo "TODO WP11"
+
+# passenger page on http://127.0.0.1:8000; usage: make passenger [SOURCE=fogstore]
+passenger:
+	uv run python -m services.passenger_info $(if $(SOURCE),--source $(SOURCE))
 
 it-resilience:
 	@echo "TODO WP12"
